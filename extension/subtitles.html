@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>外部字幕 · Better Subs</title>
+  <link rel="stylesheet" href="subtitles.css">
+</head>
+<body>
+<header><h1>外部字幕</h1><div class="row"><a href="https://assrt.net/" target="_blank" rel="noopener noreferrer">字幕服务由 assrt.net 提供</a><a href="https://subdl.com/" target="_blank" rel="noopener noreferrer">SubDL</a><a href="https://jimaku.cc/" target="_blank" rel="noopener noreferrer">Jimaku</a></div></header>
+<main>
+  <p id="status" role="status" aria-live="polite">正在读取播放页…</p>
+  <details id="settings">
+    <summary>assrt 连接设置 <span id="connection"></span></summary>
+    <div class="row">
+      <label class="grow">API Token<input id="key" type="password" maxlength="200" autocomplete="off"></label>
+      <label class="file">导入 Key 文件<input id="keyFile" type="file" accept=".txt,text/plain"></label>
+      <button id="saveKey" type="button">保存并授权</button>
+      <button id="clearKey" type="button">清除 Key</button>
+      <button id="quota" type="button">查询剩余额度</button>
+    </div>
+    <label class="check"><input id="httpDownload" type="checkbox">允许旧服务器 HTTP 字幕下载（未加密，内容可能被篡改）</label>
+  </details>
+  <details id="subdlSettings">
+    <summary>SubDL 连接设置 <span id="subdlConnection"></span></summary>
+    <div class="row">
+      <label class="grow">API Key<input id="subdlKey" type="password" maxlength="200" autocomplete="off"></label>
+      <label class="file">导入 Key 文件<input id="subdlKeyFile" type="file" accept=".txt,text/plain"></label>
+      <button id="subdlSaveKey" type="button">保存并授权</button>
+      <button id="subdlClearKey" type="button">清除 Key</button>
+      <button id="subdlQuota" type="button">查询剩余额度</button>
+      <a href="https://subdl.com/panel/api" target="_blank" rel="noopener noreferrer">申请 API Key</a>
+    </div>
+  </details>
+  <details id="jimakuSettings">
+    <summary>Jimaku 连接设置 <span id="jimakuConnection"></span></summary>
+    <div class="row">
+      <label class="grow">API Key<input id="jimakuKey" type="password" maxlength="512" autocomplete="off"></label>
+      <label class="file">导入 Key 文件<input id="jimakuKeyFile" type="file" accept=".txt,text/plain"></label>
+      <button id="jimakuSaveKey" type="button">保存并授权</button>
+      <button id="jimakuClearKey" type="button">清除 Key</button>
+      <button id="jimakuRate" type="button">查看最近请求限额</button>
+      <a href="https://jimaku.cc/account" target="_blank" rel="noopener noreferrer">申请 API Key</a>
+    </div>
+  </details>
+  <details id="assistSettings">
+    <summary>可选 AI 分析设置 <span id="assistConnection"></span></summary>
+    <div class="row"><span id="assistModel" class="muted"></span><a href="translation.html" target="_blank" rel="noopener noreferrer">翻译 API 设置</a></div>
+    <div class="row">
+      <label class="grow">独立分析 API 地址<input id="assistBase" type="url" maxlength="500" placeholder="https://example.com/v1"></label>
+      <label>协议<select id="assistProtocol"><option value="chat-completions">Chat Completions</option><option value="responses">Responses</option></select></label>
+      <label class="grow">模型<input id="assistModelInput" maxlength="200"></label>
+      <label class="grow">API Key<input id="assistKey" type="password" maxlength="4096" autocomplete="off"></label>
+      <label class="file">导入 Key 文件<input id="assistKeyFile" type="file" accept=".txt,text/plain"></label>
+      <button id="assistSave" type="button">保存并授权独立 API</button>
+      <button id="assistClear" type="button">清除独立 API</button>
+    </div>
+  </details>
+  <fieldset id="identity" disabled>
+    <legend>当前集</legend>
+    <div class="row">
+      <label class="grow">作品名<input id="title" maxlength="200"></label>
+      <label class="grow">英文名 / 罗马字<input id="englishTitle" maxlength="200"></label>
+      <label class="number">季<input id="season" type="number" min="0" max="9999"></label>
+      <label class="number">集<input id="episode" type="number" min="0" max="9999"></label>
+    </div>
+    <p id="episodeInfo" class="muted"></p>
+    <div class="row"><span id="followInfo" class="muted"></span><button id="viewFollow" type="button" hidden>查看跟随合集</button><button id="stopFollow" type="button" hidden>停止跟随</button></div>
+  </fieldset>
+  <fieldset id="searchControls" disabled>
+    <legend>搜索</legend>
+    <div class="row">
+      <label>搜索名语种<select id="nameLanguage"><option value="auto">推荐名称</option><option value="zh-CN">中文简体</option><option value="zh-TW">中文繁体</option><option value="en">英文</option><option value="ja">日文</option><option value="romaji">罗马字</option><option value="und">未标语种</option></select></label>
+      <label class="grow">名称候选<select id="nameCandidates"></select></label>
+      <button id="useSearchName" type="button">使用此名称</button>
+      <button id="officialNames" type="button">查询官方名称</button>
+      <button id="aiNames" type="button" disabled>AI 补充名称…</button>
+    </div>
+    <form id="searchForm" class="row">
+      <label>字幕源<select id="source"><option value="assrt">assrt</option><option value="subdl">SubDL</option><option value="jimaku">Jimaku（日文为主）</option></select></label>
+      <label class="grow">关键词<input id="query" list="keywords" minlength="3" maxlength="200" required><datalist id="keywords"></datalist></label>
+      <label class="check" id="fileModeLabel"><input id="fileMode" type="checkbox">按视频文件名搜索（忽略压制信息）</label>
+      <label id="subdlLanguageLabel" hidden>候选语言<select id="subdlLanguage"><option value="zh">中文（简 / 繁）</option><option value="en">英语</option><option value="ja">日语</option><option value="all">全部语言</option></select></label>
+      <label id="jimakuAnilistLabel" hidden>AniList ID<input id="jimakuAnilist" type="number" min="1" max="2147483647" step="1"></label>
+      <button type="submit" id="search">搜索</button>
+      <button type="button" id="refresh">重新查询</button>
+    </form>
+    <div id="jimakuFallback" class="row" hidden><a href="translation.html?target=ja-JP" target="_blank" rel="noopener noreferrer">机翻成日文…</a></div>
+    <div class="row spread"><span id="resultInfo" class="muted">尚未搜索</span><div class="row"><button id="backTitles" type="button" hidden>返回作品列表</button><button id="previous" type="button" disabled>上一页</button><button id="next" type="button" disabled>下一页</button></div></div>
+  </fieldset>
+  <section aria-label="字幕候选" id="results"></section>
+  <section id="fileSection" hidden>
+    <h2 id="selectedTitle">文件</h2>
+    <div class="row"><label class="grow">字幕版本<select id="versions"></select></label><button id="aiFiles" type="button" disabled>AI 辅助识别…</button></div>
+    <p id="groupInfo" class="muted"></p>
+    <div class="row">
+      <label class="grow">文件<select id="files"></select></label>
+      <label>编码<select id="encoding"><option value="auto">自动</option><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option><option value="big5">Big5</option><option value="shift_jis">Shift-JIS</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option></select></label>
+      <button id="preview" type="button">下载并预览</button>
+      <button id="openDownload" type="button">在浏览器中打开文件</button>
+    </div>
+    <details id="mapEditor">
+      <summary>集数对应校正 <span id="mapInfo"></span></summary>
+      <div class="table-wrap"><table class="mapping-table"><thead><tr><th>本版本</th><th>集数</th><th>文件</th></tr></thead><tbody id="mappingRows"></tbody></table></div>
+      <div class="row"><button id="confirmMap" type="button">确认集数对应</button><button id="resetMap" type="button">恢复本地识别</button></div>
+    </details>
+  </section>
+  <section id="previewSection" hidden>
+    <h2 id="previewTitle">字幕预览</h2>
+    <p id="previewInfo" class="muted"></p>
+    <div class="row"><label class="check"><input id="followCollection" type="checkbox">跟随此字幕合集</label><label class="check"><input id="inheritOffset" type="checkbox" disabled>后续集沿用当前偏移</label></div>
+    <div class="row timing">
+      <label>字幕语言<select id="language"><option value="zh-CN">简体中文</option><option value="zh-TW">繁体中文</option><option value="en-US">英语</option><option value="ja-JP">日语</option><option value="">未确定</option></select></label>
+      <label>偏移（秒）<input id="offset" type="number" min="-3600" max="3600" step="0.1" value="0"></label>
+      <button id="minus" type="button" title="字幕提前 100 毫秒" aria-label="字幕提前 100 毫秒">−100 ms</button>
+      <button id="plus" type="button" title="字幕延后 100 毫秒" aria-label="字幕延后 100 毫秒">+100 ms</button>
+      <label>时间倍率<input id="scale" type="number" min="0.5" max="2" step="0.000001" value="1"></label>
+      <button id="reset" type="button">重置同步</button>
+    </div>
+    <div class="row"><span id="marks" class="muted">未标记同步点</span><button id="clearMarks" type="button">清除标记</button></div>
+    <div class="row"><span id="seriesInfo" class="muted"></span><button id="useSeries" type="button" hidden>采用系列偏移</button><label class="check"><input id="remember" type="checkbox">保存为系列偏移建议</label></div>
+    <div class="row"><label class="grow">筛选字幕<input id="filter" type="search" maxlength="200"></label><button id="apply" class="primary" type="button">加载到当前播放页</button></div>
+    <div class="table-wrap"><table><thead><tr><th scope="col">序号</th><th scope="col">原时间</th><th scope="col">调整后</th><th scope="col">字幕</th><th scope="col">同步点</th></tr></thead><tbody id="cues"></tbody></table></div>
+    <div class="row spread"><span id="cueInfo" class="muted"></span><div class="row"><button id="cuePrevious" type="button">上一页</button><button id="cueNext" type="button">下一页</button></div></div>
+  </section>
+</main>
+<script src="lib/protocol.js"></script>
+<script src="lib/work-profiles.js"></script>
+<script src="lib/opencc.js"></script>
+<script src="lib/search-names.js"></script>
+<script src="lib/collection-match.js"></script>
+<script src="subtitle-assist-ui.js"></script>
+<script src="subtitles.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+name: Bug / 问题 / 不具合
+description: Report a reproducible issue without keys or full subtitle files.
+body:
+  - type: markdown
+    attributes:
+      value: 'Do not attach API keys, cookies, complete subtitles, browser profiles or raw logs. 请先脱敏。キーや字幕全文は添付しないでください。'
+  - type: input
+    id: version
+    attributes:
+      label: Extension and browser versions / 版本 / バージョン
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 操作步骤 / 再現手順
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior / 预期与实际 / 期待する動作と実際の動作
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Sanitized error / 脱敏错误 / 秘密情報を除いたエラー

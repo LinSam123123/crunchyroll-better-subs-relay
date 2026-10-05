@@ -1,0 +1,21 @@
+{
+  "name": "crunchyroll-better-subs-relay",
+  "version": "2.7.0-relay.30",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "type": "module",
+  "devDependencies": {
+    "fflate": "0.8.3",
+    "opencc-js": "1.4.2"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "package": "node tools/package.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tools/browser-test.mjs",
+    "test:external-browser": "node tools/external-browser-test.mjs",
+    "verify": "npm run build && npm test",
+    "privacy": "node tools/privacy-scan.mjs"
+  }
+}

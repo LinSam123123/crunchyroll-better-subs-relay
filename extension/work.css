@@ -1,0 +1,57 @@
+.settings-link { margin-left: auto; white-space: nowrap; }
+#status { margin: 0 0 22px; }
+#state { color: #ddc88a; font-size: 12px; flex-shrink: 0; margin-bottom: 18px; }
+dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px 14px; margin: 0 0 20px; line-height: 1.6; }
+dt { color: #aab6b6; }
+dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.meta { color: #aab6b6; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.draft-actions { margin-top: 20px; align-items: center; }
+.warning { color: #edd096; line-height: 1.7; border-left: 3px solid #ba9953; padding-left: 12px; }
+input, textarea, button { overflow-wrap: anywhere; }
+.section-heading { flex-wrap: wrap; }
+.lookup-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.lookup-subject { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 14px 0; border-top: 1px solid #374040; }
+.lookup-subject p { margin: 6px 0; }
+.lookup-subject strong, .lookup-subject a, .lookup-subject p { overflow-wrap: anywhere; }
+.lookup-filters { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.lookup-filters .check { white-space: normal; align-items: flex-start; }
+.lookup-filters input, .term-pick input { flex: 0 0 16px; }
+#lookup-title { font-size: 14px; margin: 8px 0 18px; overflow-wrap: anywhere; }
+.lookup-row { padding: 16px 0; border-top: 1px solid #374040; }
+.term-pick { display: flex; gap: 10px; align-items: flex-start; margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.term-pick input { width: 16px; height: 16px; margin-top: 3px; accent-color: #70d5ad; }
+.term-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.term-fields label { margin-top: 10px; }
+.term-note { margin: 10px 0 0; color: #ddc88a; }
+.lookup-actions { margin-top: 16px; }
+#lookup-status[data-error="true"] { color: #ffb59f; }
+#term-sources { margin-top: 16px; }
+#term-source-list { padding-left: 20px; line-height: 1.8; overflow-wrap: anywhere; }
+#organized-reference { margin: 18px 0; }
+#organized-reference h3 { font-size: 14px; }
+#organized-reference .check { margin: 16px 0 8px; white-space: normal; }
+#save-summary { border-top: 1px solid #374040; padding-top: 16px; }
+#coverage-section, #review-section { margin-top: 26px; }
+summary { cursor: pointer; line-height: 1.6; margin-bottom: 12px; }
+.coverage-row, .review-row { padding: 16px 0; border-top: 1px solid #374040; }
+.coverage-row > span { display: block; margin: 6px 0; }
+.coverage-row strong, .review-source { overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; }
+.review-row h3 { font-size: 14px; margin: 0 0 10px; }
+.review-row textarea { margin: 12px 0; min-height: 80px; }
+#review-glossary { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 13px; }
+.review-pages { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+#review-status[data-error="true"] { color: #ffb59f; }
+.glossary-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 10px; align-items: center; border-top: 1px solid #374040; padding: 12px 0; }
+.glossary-entry strong { overflow-wrap: anywhere; font-size: 13px; }
+.glossary-entry button { padding: 10px; }
+.glossary-entry .term-note { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 560px) {
+  .draft-actions { display: flex; }
+  .draft-actions button { width: 100%; }
+  .settings-link { font-size: 12px; }
+  .lookup-search, .lookup-subject, .term-fields { grid-template-columns: minmax(0, 1fr); }
+  .lookup-actions { display: flex; }
+  .lookup-actions button { flex: 1 1 100%; }
+  .glossary-entry { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .glossary-entry strong { grid-column: 1 / -1; }
+}

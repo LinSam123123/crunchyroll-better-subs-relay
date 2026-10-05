@@ -1,0 +1,1060 @@
+// ── Element refs ──────────────────────────────────────────────────────────
+const toggleEnabled       = document.getElementById('toggleEnabled');
+const toggleAuto          = document.getElementById('toggleAuto');
+// "Show on screen" per-layer visibility.  toggleShowOfficial is the INVERSE of
+// the hideOfficialSubs setting (on = CR's own subs shown).
+const toggleShowDialogue  = document.getElementById('toggleShowDialogue');
+const toggleShowSigns     = document.getElementById('toggleShowSigns');
+const toggleShowOfficial  = document.getElementById('toggleShowOfficial');
+const toggleIncludeDiag   = document.getElementById('toggleIncludeDiag');
+const scaleSlider         = document.getElementById('scaleSlider');
+const scaleLabel          = document.getElementById('scaleLabel');
+const signSizeRow         = document.getElementById('signSizeRow');
+const signScaleSlider     = document.getElementById('signScaleSlider');
+const signScaleLabel      = document.getElementById('signScaleLabel');
+const offsetLabel         = document.getElementById('offsetLabel');
+const statusDot           = document.getElementById('statusDot');
+const statusText          = document.getElementById('statusText');
+const offsetReset         = document.getElementById('offsetReset');
+const subBottomFloor      = document.getElementById('subBottomFloor');
+const subBottomFloorLabel = document.getElementById('subBottomFloorLabel');
+const toggleAutoPause     = document.getElementById('toggleAutoPause');
+const secSignGap          = document.getElementById('secSignGap');
+const secSignGapLabel     = document.getElementById('secSignGapLabel');
+// Style override
+const styleTargetSeg      = document.getElementById('styleTargetSeg');
+const toggleStyleOverrideLabel = document.getElementById('toggleStyleOverrideLabel');
+const toggleStyleOverride = document.getElementById('toggleStyleOverride');
+const styleControls       = document.getElementById('styleControls');
+const previewSpan         = document.getElementById('previewSpan');
+const fontFamily          = document.getElementById('fontFamily');
+const colorText           = document.getElementById('colorText');
+const textOpacity         = document.getElementById('textOpacity');
+const textOpacityLabel    = document.getElementById('textOpacityLabel');
+const outlineShadowCtrls  = document.getElementById('outlineShadowControls');
+const colorOutline        = document.getElementById('colorOutline');
+const bordSlider          = document.getElementById('bordSlider');
+const bordLabel           = document.getElementById('bordLabel');
+const shadSlider          = document.getElementById('shadSlider');
+const shadLabel           = document.getElementById('shadLabel');
+const shadStyleSeg        = document.getElementById('shadStyleSeg');
+const shadOpacity         = document.getElementById('shadOpacity');
+const shadOpacityLabel    = document.getElementById('shadOpacityLabel');
+const toggleBgBox         = document.getElementById('toggleBgBox');
+const bgControls          = document.getElementById('bgControls');
+const bgColor             = document.getElementById('bgColor');
+const bgOpacity           = document.getElementById('bgOpacity');
+const bgOpacityLabel      = document.getElementById('bgOpacityLabel');
+const bgRadius            = document.getElementById('bgRadius');
+const bgRadiusLabel       = document.getElementById('bgRadiusLabel');
+const bgPaddingX          = document.getElementById('bgPaddingX');
+const bgPaddingXLabel     = document.getElementById('bgPaddingXLabel');
+const bgPaddingY          = document.getElementById('bgPaddingY');
+const bgPaddingYLabel     = document.getElementById('bgPaddingYLabel');
+const toggleForceColor    = document.getElementById('toggleForceColor');
+const forceColorRow       = document.getElementById('forceColorRow');
+const toggleBgGlass       = document.getElementById('toggleBgGlass');
+const glassControls       = document.getElementById('glassControls');
+const bgGlassBlur         = document.getElementById('bgGlassBlur');
+const bgGlassBlurLabel    = document.getElementById('bgGlassBlurLabel');
+const bgGlassSat          = document.getElementById('bgGlassSat');
+const bgGlassSatLabel     = document.getElementById('bgGlassSatLabel');
+const bgGlassHue          = document.getElementById('bgGlassHue');
+const bgGlassHueLabel     = document.getElementById('bgGlassHueLabel');
+const presetSelect        = document.getElementById('presetSelect');
+const previewBox          = document.getElementById('previewBox');
+const togglePreviewAnimate = document.getElementById('togglePreviewAnimate');
+// Machine translation
+const toggleMtEnabled     = document.getElementById('toggleMtEnabled');
+const mtStatus            = document.getElementById('mtStatus');
+
+// ── Style presets ─────────────────────────────────────────────────────────
+// Each preset is a partial settings bundle that gets merged on top of the
+// schema defaults when applied.  Order: keys that affect the "look".
+// presetSelect.value is matched back against these so the dropdown stays
+// in sync with the actual settings — if the user nudges any slider after
+// applying a preset, the dropdown reverts to "Custom".
+const PRESETS = {
+  'cr-default': {
+    label: 'CR Default',
+    settings: {
+      styleOverride: false,
+    },
+  },
+  'white-outlined': {
+    label: 'White & Outlined',
+    settings: {
+      styleOverride:        true,
+      overrideFontFamily:   '',
+      overrideTextColor:    '#ffffff',
+      overrideTextOpacity:  100,
+      overrideOutlineColor: '#000000',
+      overrideBord:         3,
+      overrideShad:         0,
+      overrideShadStyle:    'hard',
+      overrideShadOpacity:  80,
+      overrideBgBox:        false,
+      overrideBgGlass:      false,
+    },
+  },
+  'sticker': {
+    label: 'Sticker',
+    settings: {
+      styleOverride:        true,
+      overrideFontFamily:   '',
+      overrideTextColor:    '#fff8e7',
+      overrideTextOpacity:  100,
+      overrideOutlineColor: '#000000',
+      overrideBord:         4,
+      overrideShad:         2,
+      overrideShadStyle:    'hard',
+      overrideShadOpacity:  70,
+      overrideBgBox:        false,
+      overrideBgGlass:      false,
+    },
+  },
+  'glass': {
+    label: 'Glass',
+    settings: {
+      styleOverride:        true,
+      overrideTextColor:    '#ffffff',
+      overrideTextOpacity:  100,
+      overrideBord:         0,
+      overrideShad:         0,
+      overrideBgBox:        true,
+      overrideBgColor:      '#000000',
+      overrideBgOpacity:    30,
+      overrideBgRadius:     12,
+      overrideBgPaddingX:   16,
+      overrideBgPaddingY:   4,
+      overrideBgGlass:      true,
+      overrideBgGlassBlur:  12,
+      overrideBgGlassSat:   160,
+      overrideBgGlassHue:   0,
+    },
+  },
+};
+
+// Return the preset id whose `settings` is a subset-match of the current
+// state, or null if nothing matches (→ dropdown shows "Custom").
+function matchingPresetId(state) {
+  for (const [id, preset] of Object.entries(PRESETS)) {
+    let match = true;
+    for (const [k, v] of Object.entries(preset.settings)) {
+      if (state[k] !== v) { match = false; break; }
+    }
+    if (match) return id;
+  }
+  return null;
+}
+
+let currentShadStyle = 'hard';
+
+// ── Status indicator ──────────────────────────────────────────────────────
+// Status enum (S) and message types (MSG) come from lib/protocol.js — the
+// single source of truth shared with content.js, interceptor.js, and
+// background.js.  STATUS_DISPLAY maps each protocol value to popup chrome.
+const { STATUS: S, MSG } = self.CRSubFix.protocol;
+
+const STATUS_DISPLAY = {
+  [S.NONE]:        { color: '#555',    pulse: false, text: 'Waiting for episode to load' },
+  loading:         { color: '#ffc107', pulse: true,  text: 'Fetching subtitle data…' },
+  [S.READY]:       { color: '#4caf50', pulse: false, text: 'Subtitles ready' },
+  [S.ACTIVE]:      { color: '#ff6b35', pulse: true,  text: 'Subtitles active' },
+  [S.RELOAD]:      { color: '#ffc107', pulse: false, text: 'Reload tab to activate subtitles' },
+  [S.ERROR]:       { color: '#e55',    pulse: false, text: 'Error fetching subtitles — click the player button to retry' },
+  [S.UNAVAILABLE]: { color: '#555',    pulse: false, text: 'No subtitles available for this episode' },
+  notwatch:        { color: '#555',    pulse: false, text: 'Not on an episode page' },
+  noscript:        { color: '#ffc107', pulse: false, text: 'Extension not active in this tab' },
+};
+
+// Minimal locale-code → friendly name table.  Mirrors the larger map in
+// interceptor.js but only carries the common ones — anything not listed
+// is shown as the raw code (e.g. "tr-TR"), which is still informative.
+const LOCALE_LABELS = {
+  'ja-JP': 'English (Japanese audio)',  'en-US': 'English',  'en-GB': 'English (UK)',
+  'de-DE': 'German',    'es-419':'Spanish (LA)','es-ES':'Spanish',
+  'fr-FR': 'French',    'pt-BR': 'Portuguese (BR)','pt-PT':'Portuguese',
+  'it-IT': 'Italian',   'ru-RU': 'Russian',  'ar-SA': 'Arabic',
+  'zh-CN': 'Chinese (Simpl.)','zh-TW':'Chinese (Trad.)',
+  'hi-IN': 'Hindi',     'ko-KR': 'Korean',
+};
+const localeName = (l) => l ? (LOCALE_LABELS[l] ?? l) : null;
+
+function setStatus(key, info) {
+  const cfg = STATUS_DISPLAY[key] ?? STATUS_DISPLAY[S.NONE];
+  statusDot.style.background = cfg.color;
+  statusDot.classList.toggle('pulse', cfg.pulse);
+  statusText.textContent = cfg.text;
+
+  // Live detail grid: what's showing, the audio language, and remaster sync.
+  // Shown only when there's something active to report; keeps the card clean
+  // when nothing's playing.
+  const grid    = document.getElementById('stGrid');
+  const hint    = document.getElementById('stHint');
+  const showing = info?.source ? localeName(info.source) : null;
+  const audio   = info?.audio  ? localeName(info.audio)  : null;
+  const sync    = info?.remaster === 'synced'  ? 'Synced'
+                : info?.remaster === 'pending' ? 'Adjusting…' : null;
+  if (grid && (showing || audio)) {
+    document.getElementById('stShowing').textContent = showing ?? '—';
+    document.getElementById('stAudio').textContent   = audio ?? '—';
+    document.getElementById('stSync').textContent    = sync ?? '—';
+    grid.classList.remove('hidden');
+    if (hint) hint.style.display = 'none';
+  } else {
+    if (grid) grid.classList.add('hidden');
+    // Adaptive empty state: point the user at the next step.  (For error /
+    // reload / unavailable the status text already carries the instruction.)
+    let t = '';
+    if (key === 'notwatch')     t = 'Open a Crunchyroll episode to start.';
+    else if (key === S.READY)   t = 'Open the ▾ menu on the player to pick a language.';
+    if (hint) { hint.textContent = t; hint.style.display = t ? '' : 'none'; }
+  }
+}
+
+(async () => {
+  async function queryStatus() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return null;
+    return chrome.tabs.sendMessage(tab.id, { type: MSG.GET_STATUS });
+  }
+  try {
+    const resp = await queryStatus();
+    setStatus(resp?.jpStatus ?? S.NONE, resp?.activeInfo);
+  } catch (_) {
+    // Content script may not have finished injecting yet (page still loading).
+    // Wait briefly before concluding we're not on a watch page.
+    await new Promise(r => setTimeout(r, 400));
+    try {
+      const resp = await queryStatus();
+      setStatus(resp?.jpStatus ?? S.NONE, resp?.activeInfo);
+    } catch (_) {
+      // No content script answered.  If the tab IS Crunchyroll, the script
+      // simply isn't injected — Chrome never injects into tabs that were
+      // already open when the extension was installed or auto-updated, so
+      // every release orphans open episode tabs until they reload.
+      let tab = null;
+      try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch (_) {}
+      if (/^https?:\/\/www\.crunchyroll\.com\//.test(tab?.url ?? '')) {
+        setStatus('noscript');
+        const hint = document.getElementById('stHint');
+        if (hint) {
+          hint.textContent = 'This tab was open before the extension loaded — reload it to activate. ';
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'st-reload';
+          b.textContent = 'Reload tab';
+          b.addEventListener('click', () => { chrome.tabs.reload(tab.id); window.close(); });
+          hint.appendChild(b);
+          hint.style.display = '';
+        }
+      } else {
+        setStatus('notwatch');
+      }
+    }
+  }
+})();
+
+// ── Live preview ──────────────────────────────────────────────────────────
+// Outlined text is rendered via the shared SVG builder in lib/cue-style.js
+// so a formula change lands in one place and the preview matches playback.
+const { hexToRgba, createOutlinedTextSvg, resolveBgYInsets, buildGlassCss } = self.CRSubFix.cueStyle;
+const PREVIEW_TEXT = 'Subtitle preview text';
+
+// Replace the previewSpan contents with a single SVG (or styled span for
+// bg-box mode) reflecting the current overlay settings.
+function renderPreviewContent(node) {
+  previewSpan.textContent = '';
+  previewSpan.appendChild(node);
+}
+
+function updatePreview() {
+  const override = toggleStyleOverride.checked;
+
+  // Reset the container styles each call — earlier calls may have set
+  // background / padding on the span itself when bg-box was enabled.
+  previewSpan.style.cssText =
+    'display:inline-block;line-height:1.6;padding:0 2px;background:none;';
+
+  if (!override) {
+    // Default look — white text, black silhouette outline.  Same SVG
+    // builder as the page-side renderer for byte-equal styling.
+    renderPreviewContent(createOutlinedTextSvg(PREVIEW_TEXT, {
+      fillColor:    'rgb(255,255,255)',
+      outlineColor: 'rgb(0,0,0)',
+      bord:         2,
+      fontFamily:   'Arial, sans-serif',
+      fontSize:     '13px',
+      weight:       '500',
+    }));
+    return;
+  }
+
+  const textAlpha = parseInt(textOpacity.value) / 100;
+  const textColor = hexToRgba(colorText.value, textAlpha);
+  const font      = fontFamily.value || 'Arial, sans-serif';
+  const bgEnabled = toggleBgBox.checked;
+
+  if (bgEnabled) {
+    // bg-box mode renders as a styled HTML span — no outline / stroke.
+    const alpha  = parseInt(bgOpacity.value) / 100;
+    const bgCol  = hexToRgba(bgColor.value, alpha);
+    // Signs render through libass: rectangular box, no backdrop-blur glass — so
+    // the sign preview drops radius + glass to match what actually shows.
+    const signs  = styleTarget === 'signs';
+    const radius = signs ? 0 : parseInt(bgRadius.value);
+    const px     = parseInt(bgPaddingX.value);
+    const pySlider = parseInt(bgPaddingY.value);
+    const { paddingY, lineHeight } = resolveBgYInsets(pySlider);
+    const span = document.createElement('span');
+    let glassCss = '';
+    if (toggleBgGlass.checked && !signs) {
+      // Same recipe as the page-side renderer — both call the shared builder
+      // in lib/cue-style.js so the preview equals playback.
+      glassCss = buildGlassCss({
+        blur: parseInt(bgGlassBlur.value),
+        sat:  parseInt(bgGlassSat.value),
+        hue:  parseInt(bgGlassHue.value),
+      });
+    }
+    span.style.cssText =
+      `display:inline-block;color:${textColor};font-family:${font};font-size:13px;` +
+      `font-weight:500;line-height:${lineHeight};` +
+      `background:${bgCol};border-radius:${radius}px;padding:${paddingY}px ${px}px;` +
+      glassCss;
+    span.textContent = PREVIEW_TEXT;
+    renderPreviewContent(span);
+    return;
+  }
+
+  renderPreviewContent(createOutlinedTextSvg(PREVIEW_TEXT, {
+    fillColor:    textColor,
+    outlineColor: colorOutline.value,
+    bord:         parseFloat(bordSlider.value),
+    fontFamily:   font,
+    fontSize:     '13px',
+    weight:       '500',
+    shad:         parseFloat(shadSlider.value),
+    shadowColor:  'rgb(0,0,0)',
+    soft:         currentShadStyle === 'soft',
+    shadOpacity:  parseInt(shadOpacity.value) / 100,
+  }));
+}
+
+// ── Load settings ─────────────────────────────────────────────────────────
+
+// ── Per-type style profiles (dialogue vs typeset signs) ───────────────────
+// The same controls edit either profile; the selected target prefixes the
+// schema keys ('' = dialogue, 'sign_' = signs).  setStyle() routes writes to
+// the active target; styleProfile() projects a settings object onto the active
+// target's values so the populate code can keep reading base key names.
+const STYLE_KEYS = [
+  'styleOverride', 'overrideFontFamily', 'overrideTextColor', 'overrideTextOpacity',
+  'overrideOutlineColor', 'overrideBord', 'overrideShad', 'overrideShadStyle',
+  'overrideShadOpacity', 'overrideBgBox', 'overrideBgColor', 'overrideBgOpacity',
+  'overrideBgRadius', 'overrideBgPaddingX', 'overrideBgPaddingY', 'overrideBgGlass',
+  'overrideBgGlassBlur', 'overrideBgGlassSat', 'overrideBgGlassHue',
+];
+let styleTarget = 'dialogue';   // 'dialogue' | 'signs'
+
+// ── Coalesced setting writes ────────────────────────────────────────────────
+// Slider `input` fires dozens of times/sec during a drag, and every write
+// crosses into chrome.storage → the page's storage.onChanged → a live
+// re-render.  Writing on every pixel floods that pipeline.  Instead the
+// handlers update their label/preview synchronously (instant feedback) but
+// route the actual write through queueSet(), which merges rapid writes and
+// flushes them on a trailing timer.  Discrete actions (presets, with a cb)
+// write immediately, flushing any pending drag first so a stale queued value
+// can't clobber them afterwards.
+let _pending = null, _pendingTimer = null;
+function flushPending() {
+  if (_pendingTimer) { clearTimeout(_pendingTimer); _pendingTimer = null; }
+  if (!_pending) return;
+  const obj = _pending; _pending = null;
+  chrome.storage.local.set(obj);
+}
+function queueSet(obj) {
+  _pending = Object.assign(_pending || {}, obj);
+  if (_pendingTimer) clearTimeout(_pendingTimer);
+  _pendingTimer = setTimeout(flushPending, 120);
+}
+// Don't lose the last drag value if the popup closes within the debounce window.
+window.addEventListener('pagehide', flushPending);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushPending(); });
+
+function projectStyle(obj) {
+  if (styleTarget !== 'signs') return obj;
+  const out = {};
+  for (const k in obj) out[STYLE_KEYS.includes(k) ? 'sign_' + k : k] = obj[k];
+  return out;
+}
+function setStyle(obj, cb) {
+  const out = projectStyle(obj);
+  if (cb) { flushPending(); chrome.storage.local.set(out, cb); }
+  else queueSet(out);
+}
+function styleProfile(s) {
+  if (styleTarget !== 'signs') return s;
+  const out = Object.assign({}, s);
+  for (const base of STYLE_KEYS) out[base] = s['sign_' + base];
+  return out;
+}
+
+function populateFromSettings(s) {
+  toggleEnabled.checked = s.enabled;
+  toggleAuto.checked    = s.autoActivate;
+  toggleShowDialogue.checked = s.showDialogue;
+  toggleShowSigns.checked    = s.showSigns;
+  toggleShowOfficial.checked = !s.hideOfficialSubs;   // inverse: on = CR subs shown
+  toggleIncludeDiag.checked  = s.includeDiagnostics;
+  if (toggleAutoPause) toggleAutoPause.checked = s.autoPauseLine;
+  if (secSignGap) { secSignGap.value = s.secondarySignGap; secSignGapLabel.textContent = `${s.secondarySignGap}%`; }
+  const pct = Math.round(s.subScale * 100);
+  scaleSlider.value      = pct;
+  scaleLabel.textContent = `${pct}%`;
+  renderOffsetLabel(s.subOffset);
+  subBottomFloor.value         = s.subBottomFloor;
+  subBottomFloorLabel.textContent = `${s.subBottomFloor}%`;
+
+  // Style overrides — read the ACTIVE profile (dialogue or signs).
+  const sp = styleProfile(s);
+  styleTargetSeg?.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === styleTarget);
+  });
+  const styleLabel = (styleTarget === 'signs') ? 'signs' : 'dialogue';
+  if (toggleStyleOverrideLabel) toggleStyleOverrideLabel.textContent =
+    styleTarget === 'signs' ? 'Custom style for signs' : 'Override subtitle style';
+
+  toggleStyleOverride.checked = sp.styleOverride;
+  styleControls.classList.toggle('disabled', !sp.styleOverride);
+
+  fontFamily.value          = sp.overrideFontFamily;
+
+  colorText.value           = sp.overrideTextColor;
+  textOpacity.value         = sp.overrideTextOpacity;
+  textOpacityLabel.textContent = `${sp.overrideTextOpacity}%`;
+
+  colorOutline.value        = sp.overrideOutlineColor;
+  bordSlider.value          = sp.overrideBord;
+  bordLabel.textContent     = sp.overrideBord;
+
+  shadSlider.value          = sp.overrideShad;
+  shadLabel.textContent     = sp.overrideShad;
+  currentShadStyle          = sp.overrideShadStyle ?? 'hard';
+  shadStyleSeg.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === currentShadStyle);
+  });
+  shadOpacity.value         = sp.overrideShadOpacity;
+  shadOpacityLabel.textContent = `${sp.overrideShadOpacity}%`;
+
+  toggleBgBox.checked       = sp.overrideBgBox;
+  bgControls.classList.toggle('disabled', !sp.overrideBgBox);
+  outlineShadowCtrls.classList.toggle('disabled', sp.overrideBgBox);
+  bgColor.value              = sp.overrideBgColor;
+  bgOpacity.value            = sp.overrideBgOpacity;
+  bgOpacityLabel.textContent = `${sp.overrideBgOpacity}%`;
+  bgRadius.value             = sp.overrideBgRadius;
+  bgRadiusLabel.textContent  = `${sp.overrideBgRadius}px`;
+  bgPaddingX.value           = sp.overrideBgPaddingX;
+  bgPaddingXLabel.textContent = `${sp.overrideBgPaddingX}px`;
+  bgPaddingY.value           = sp.overrideBgPaddingY;
+  bgPaddingYLabel.textContent = `${sp.overrideBgPaddingY}px`;
+
+  toggleBgGlass.checked      = sp.overrideBgGlass;
+  glassControls.classList.toggle('disabled', !sp.overrideBgGlass);
+  // Signs render through libass, which can't do CSS backdrop-blur OR rounded-box
+  // corners — so the glass effect and corner radius are dialogue-only; hide both
+  // when editing signs (otherwise their sliders look live but do nothing).
+  const isSignsType = styleTarget === 'signs';
+  const glassRow = toggleBgGlass.closest('.row');
+  if (glassRow) glassRow.style.display = isSignsType ? 'none' : '';
+  glassControls.style.display          = isSignsType ? 'none' : '';
+  const radiusRow = bgRadius.closest('.row');
+  if (radiusRow) radiusRow.style.display = isSignsType ? 'none' : '';
+  // Force-text-colour is signs-only (CSS dialogue colour always applies anyway).
+  forceColorRow.style.display = isSignsType ? '' : 'none';
+  toggleForceColor.checked    = !!s.sign_forceColor;
+  // Sign text size — signs only, independent of the override toggle.
+  signSizeRow.style.display = isSignsType ? '' : 'none';
+  const signPct = Math.round((Number(s.sign_textScale) || 1) * 100);
+  signScaleSlider.value      = signPct;
+  signScaleLabel.textContent = `${signPct}%`;
+  bgGlassBlur.value          = sp.overrideBgGlassBlur;
+  bgGlassBlurLabel.textContent = `${sp.overrideBgGlassBlur}px`;
+  bgGlassSat.value           = sp.overrideBgGlassSat;
+  bgGlassSatLabel.textContent = `${sp.overrideBgGlassSat}%`;
+  bgGlassHue.value           = sp.overrideBgGlassHue;
+  bgGlassHueLabel.textContent = `${sp.overrideBgGlassHue}°`;
+
+  presetSelect.value = matchingPresetId(sp) ?? '';
+
+  // Machine translation selectors (the API key is NOT a schema setting — it's
+  // loaded/saved separately so it never enters the synced settings bundle).
+  if (toggleMtEnabled) toggleMtEnabled.checked = s.mtEnabled !== false;
+
+  updatePreview();
+}
+
+function loadFromStorage() {
+  chrome.storage.local.get(self.CRSubFix.settings.defaults(), populateFromSettings);
+}
+
+loadFromStorage();
+
+// ── Machine translation ───────────────────────────────────────────────────
+async function refreshMtStatus() {
+  if (!mtStatus) return;
+  try {
+    const state = await chrome.runtime.sendMessage({ type: MSG.MT_GET_CONFIG });
+    if (!state?.ok) throw new Error();
+    mtStatus.textContent = state.hasKey && state.authorized
+      ? `${state.config.provider === 'relay' ? state.config.model : 'DeepL'} · ${state.target}`
+      : '未配置 / Not configured';
+    toggleMtEnabled.checked = state.enabled;
+  } catch (_) { mtStatus.textContent = '设置读取失败 / Settings unavailable'; }
+}
+refreshMtStatus();
+chrome.storage.onChanged.addListener((_changes, area) => {
+  if (area === 'local') refreshMtStatus();
+});
+
+toggleMtEnabled?.addEventListener('change', () => {
+  chrome.storage.local.set({ mtEnabled: toggleMtEnabled.checked });
+});
+// ── Enable / Auto-activate ────────────────────────────────────────────────
+
+toggleEnabled.addEventListener('change', () => {
+  chrome.storage.local.set({ enabled: toggleEnabled.checked });
+});
+toggleAuto.addEventListener('change', () => {
+  chrome.storage.local.set({ autoActivate: toggleAuto.checked });
+});
+toggleShowDialogue.addEventListener('change', () => {
+  chrome.storage.local.set({ showDialogue: toggleShowDialogue.checked });
+});
+toggleShowSigns.addEventListener('change', () => {
+  chrome.storage.local.set({ showSigns: toggleShowSigns.checked });
+});
+toggleShowOfficial.addEventListener('change', () => {
+  // "Show CR's own subtitles" is the inverse of the hideOfficialSubs setting.
+  chrome.storage.local.set({ hideOfficialSubs: !toggleShowOfficial.checked });
+});
+toggleAutoPause?.addEventListener('change', () => {
+  chrome.storage.local.set({ autoPauseLine: toggleAutoPause.checked });
+});
+toggleIncludeDiag.addEventListener('change', () => {
+  chrome.storage.local.set({ includeDiagnostics: toggleIncludeDiag.checked });
+});
+
+// ── Subtitle size ─────────────────────────────────────────────────────────
+
+scaleSlider.addEventListener('input', () => {
+  const pct = parseInt(scaleSlider.value);
+  scaleLabel.textContent = `${pct}%`;
+  queueSet({ subScale: pct / 100 });
+});
+
+signScaleSlider.addEventListener('input', () => {
+  const pct = parseInt(signScaleSlider.value);
+  signScaleLabel.textContent = `${pct}%`;
+  queueSet({ sign_textScale: pct / 100 });   // signs-only key
+});
+
+// ── Sync offset ───────────────────────────────────────────────────────────
+
+function renderOffsetLabel(offset) {
+  const sign = offset >= 0 ? '+' : '-';
+  const abs  = Math.abs(offset);
+  if (abs < 60) {
+    offsetLabel.textContent = `${sign}${abs.toFixed(1)}s`;
+  } else {
+    const m = Math.floor(abs / 60);
+    const s = (abs % 60).toFixed(1).padStart(4, '0');
+    offsetLabel.textContent = `${sign}${m}:${s}`;
+  }
+}
+
+function adjustOffset(delta) {
+  chrome.storage.local.get({ subOffset: 0 }, ({ subOffset }) => {
+    // ±60 minutes (matches README); enough headroom for badly-cut sources.
+    const next = Math.max(-3600, Math.min(3600, Math.round((subOffset + delta) * 10) / 10));
+    chrome.storage.local.set({ subOffset: next });
+    renderOffsetLabel(next);
+  });
+}
+
+document.querySelectorAll('[data-delta]').forEach(btn => {
+  btn.addEventListener('click', () => adjustOffset(parseFloat(btn.dataset.delta)));
+});
+offsetReset.addEventListener('click', () => {
+  chrome.storage.local.set({ subOffset: 0 });
+  renderOffsetLabel(0);
+});
+
+subBottomFloor.addEventListener('input', () => {
+  const v = parseInt(subBottomFloor.value);
+  subBottomFloorLabel.textContent = `${v}%`;
+  queueSet({ subBottomFloor: v });
+});
+
+secSignGap?.addEventListener('input', () => {
+  const v = parseInt(secSignGap.value);
+  secSignGapLabel.textContent = `${v}%`;
+  queueSet({ secondarySignGap: v });
+});
+
+// ── Style override controls ───────────────────────────────────────────────
+
+// Pick which subtitle type the style controls edit; reload them from that
+// type's saved profile.  (Signs default to "match original" = override off.)
+styleTargetSeg?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn || btn.dataset.val === styleTarget) return;
+  styleTarget = btn.dataset.val === 'signs' ? 'signs' : 'dialogue';
+  loadFromStorage();   // re-populates every style control from the new profile
+  updatePreview();
+});
+
+toggleStyleOverride.addEventListener('change', () => {
+  const on = toggleStyleOverride.checked;
+  setStyle({ styleOverride: on });
+  styleControls.classList.toggle('disabled', !on);
+  updatePreview();
+});
+
+fontFamily.addEventListener('change', () => {
+  setStyle({ overrideFontFamily: fontFamily.value });
+  updatePreview();
+});
+
+colorText.addEventListener('input', () => {
+  setStyle({ overrideTextColor: colorText.value });
+  updatePreview();
+});
+
+textOpacity.addEventListener('input', () => {
+  const v = parseInt(textOpacity.value);
+  textOpacityLabel.textContent = `${v}%`;
+  setStyle({ overrideTextOpacity: v });
+  updatePreview();
+});
+
+colorOutline.addEventListener('input', () => {
+  setStyle({ overrideOutlineColor: colorOutline.value });
+  updatePreview();
+});
+
+bordSlider.addEventListener('input', () => {
+  const v = parseFloat(bordSlider.value);
+  bordLabel.textContent = v;
+  setStyle({ overrideBord: v });
+  updatePreview();
+});
+
+shadSlider.addEventListener('input', () => {
+  const v = parseFloat(shadSlider.value);
+  shadLabel.textContent = v;
+  setStyle({ overrideShad: v });
+  updatePreview();
+});
+
+shadStyleSeg.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  currentShadStyle = btn.dataset.val;
+  shadStyleSeg.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', b === btn);
+  });
+  setStyle({ overrideShadStyle: currentShadStyle });
+  updatePreview();
+});
+
+shadOpacity.addEventListener('input', () => {
+  const v = parseInt(shadOpacity.value);
+  shadOpacityLabel.textContent = `${v}%`;
+  setStyle({ overrideShadOpacity: v });
+  updatePreview();
+});
+
+toggleBgBox.addEventListener('change', () => {
+  const on = toggleBgBox.checked;
+  setStyle({ overrideBgBox: on });
+  bgControls.classList.toggle('disabled', !on);
+  // Outline + Shadow do nothing when the background box is on, so dim them too.
+  outlineShadowCtrls.classList.toggle('disabled', on);
+  updatePreview();
+});
+
+toggleForceColor.addEventListener('change', () => {
+  // Signs-only key, written directly (setStyle only prefixes STYLE_KEYS).
+  chrome.storage.local.set({ sign_forceColor: toggleForceColor.checked });
+});
+
+bgColor.addEventListener('input', () => {
+  setStyle({ overrideBgColor: bgColor.value });
+  updatePreview();
+});
+
+bgOpacity.addEventListener('input', () => {
+  const v = parseInt(bgOpacity.value);
+  bgOpacityLabel.textContent = `${v}%`;
+  setStyle({ overrideBgOpacity: v });
+  updatePreview();
+});
+
+bgRadius.addEventListener('input', () => {
+  const v = parseInt(bgRadius.value);
+  bgRadiusLabel.textContent = `${v}px`;
+  setStyle({ overrideBgRadius: v });
+  updatePreview();
+});
+
+bgPaddingX.addEventListener('input', () => {
+  const v = parseInt(bgPaddingX.value);
+  bgPaddingXLabel.textContent = `${v}px`;
+  setStyle({ overrideBgPaddingX: v });
+  updatePreview();
+});
+
+bgPaddingY.addEventListener('input', () => {
+  const v = parseInt(bgPaddingY.value);
+  bgPaddingYLabel.textContent = `${v}px`;
+  setStyle({ overrideBgPaddingY: v });
+  updatePreview();
+});
+
+// ── Glass effect ─────────────────────────────────────────────────────────
+toggleBgGlass.addEventListener('change', () => {
+  const on = toggleBgGlass.checked;
+  setStyle({ overrideBgGlass: on });
+  glassControls.classList.toggle('disabled', !on);
+  updatePreview();
+});
+
+bgGlassBlur.addEventListener('input', () => {
+  const v = parseInt(bgGlassBlur.value);
+  bgGlassBlurLabel.textContent = `${v}px`;
+  setStyle({ overrideBgGlassBlur: v });
+  updatePreview();
+});
+
+bgGlassSat.addEventListener('input', () => {
+  const v = parseInt(bgGlassSat.value);
+  bgGlassSatLabel.textContent = `${v}%`;
+  setStyle({ overrideBgGlassSat: v });
+  updatePreview();
+});
+
+bgGlassHue.addEventListener('input', () => {
+  const v = parseInt(bgGlassHue.value);
+  bgGlassHueLabel.textContent = `${v}°`;
+  setStyle({ overrideBgGlassHue: v });
+  updatePreview();
+});
+
+// ── Tooltip positioning ───────────────────────────────────────────────────
+// Single fixed-position tooltip element reused for every [data-tip] target.
+// Positioned above the target when there's room, otherwise below; clamped
+// to the popup viewport so it never overflows the right edge or wraps to a
+// 13px column.
+(function setupTips() {
+  let tipEl = null;
+  function ensureTip() {
+    if (tipEl) return tipEl;
+    tipEl = document.createElement('div');
+    tipEl.className = 'cr-tip';
+    document.body.appendChild(tipEl);
+    return tipEl;
+  }
+  function showTip(target) {
+    const text = target.dataset.tip;
+    if (!text) return;
+    const tip = ensureTip();
+    tip.textContent = text;
+    tip.style.display = 'block';
+    // Force a layout pass so getBoundingClientRect reflects the new size.
+    tip.style.left = '0px';
+    tip.style.top  = '0px';
+    const r = target.getBoundingClientRect();
+    const tr = tip.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    let left = r.left + (r.width / 2) - (tr.width / 2);
+    left = Math.max(6, Math.min(left, vw - tr.width - 6));
+    let top = r.top - tr.height - 8;
+    if (top < 6) top = Math.min(r.bottom + 8, vh - tr.height - 6);
+    tip.style.left = `${left}px`;
+    tip.style.top  = `${top}px`;
+    // Add show class on next frame so the opacity transition runs.
+    requestAnimationFrame(() => tip.classList.add('show'));
+  }
+  function hideTip() {
+    if (!tipEl) return;
+    tipEl.classList.remove('show');
+    setTimeout(() => { if (tipEl && !tipEl.classList.contains('show')) tipEl.style.display = 'none'; }, 150);
+  }
+  for (const el of document.querySelectorAll('[data-tip]')) {
+    el.addEventListener('mouseenter', () => showTip(el));
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('focus',      () => showTip(el));
+    el.addEventListener('blur',       hideTip);
+  }
+})();
+
+presetSelect.addEventListener('change', () => {
+  const id = presetSelect.value;
+  if (!id) return;                 // "Custom" — no-op
+  const preset = PRESETS[id];
+  if (!preset) return;
+  setStyle(preset.settings, () => {
+    // Reload UI from storage so every control reflects the new bundle.
+    // populateFromSettings also re-runs matchingPresetId, so the dropdown
+    // sticks on the chosen preset until the user nudges any slider.
+    loadFromStorage();
+  });
+});
+
+// ── Preview animation toggle ──────────────────────────────────────────────
+// Popup-only preference (no page-side effect), so stored as a plain
+// chrome.storage key without registering in SCHEMA.  Default off.
+chrome.storage.local.get({ previewAnimate: false }, ({ previewAnimate }) => {
+  togglePreviewAnimate.checked = previewAnimate;
+  previewBox.classList.toggle('animated', previewAnimate);
+});
+
+togglePreviewAnimate.addEventListener('change', () => {
+  const on = togglePreviewAnimate.checked;
+  chrome.storage.local.set({ previewAnimate: on });
+  previewBox.classList.toggle('animated', on);
+});
+
+// ── Report a problem ──────────────────────────────────────────────────────
+// Primary: POST a redacted diagnostics bundle (+ optional note) straight to the
+// report endpoint (your Worker → Discord) — one click, no GitHub account needed,
+// lands where the automatic error reports do.  Secondary link: open a pre-filled
+// public GitHub issue (the user submits it).  The trace comes from content.js
+// (GET_DIAG); version/browser are popup context.  A failed sendMessage just means
+// the active tab isn't a Crunchyroll page.
+const reportSend      = document.getElementById('reportSend');
+const reportNote      = document.getElementById('reportNote');
+const reportGithub    = document.getElementById('reportGithub');
+const ISSUES_URL      = 'https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll/issues/new';
+const REPORT_ENDPOINT = (self.CRSubFix.config && self.CRSubFix.config.REPORT_ENDPOINT) || '';
+const REPORT_TOKEN    = (self.CRSubFix.config && self.CRSubFix.config.REPORT_TOKEN) || '';
+// Content-Type plus the optional shared-secret header the Worker enforces
+// when its REPORT_TOKEN env var is set.
+const reportHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(REPORT_TOKEN ? { 'X-Better-Subs-Token': REPORT_TOKEN } : {}),
+});
+
+// Coarse, non-identifying platform string (OS family + Chrome major).  We never
+// send the full User-Agent — it's a fingerprinting surface — at any level.
+function coarsePlatform() {
+  const ua = navigator.userAgent || '';
+  let os = 'Unknown';
+  if (/Windows NT/.test(ua)) os = 'Windows';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/CrOS/.test(ua)) os = 'ChromeOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  const m = ua.match(/(?:Chrome|Chromium)\/(\d+)/);
+  return `${os} · Chrome ${m ? m[1] : '?'}`;
+}
+
+async function buildDiagnostics(full) {
+  const lines = [
+    'Better Subs for Crunchyroll — debug info',
+    `version : ${chrome.runtime.getManifest().version}`,
+    `platform: ${coarsePlatform()}`,
+  ];
+  if (!full) { lines.push('(diagnostics minimized — only version + platform + your note)'); return lines.join('\n'); }
+  let page = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) page = await chrome.tabs.sendMessage(tab.id, { type: MSG.GET_DIAG });
+  } catch (_) { /* no content script on the active tab → not a Crunchyroll page */ }
+
+  if (page) {
+    const s = page.settings || {};
+    // Just the episode guid (a public id), not the full titled URL.
+    const epm = (page.url || '').match(/\/watch\/([^/?#]+)/);
+    lines.push(`episode : ${epm ? epm[1] : '-'}`);
+    lines.push(`state   : jpStatus=${page.jpStatus} active=${page.jpActive} ` +
+               `source=${page.activeInfo?.source ?? '-'} audio=${page.activeInfo?.audio ?? '-'}`);
+    lines.push(`settings: enabled=${s.enabled} auto=${s.autoActivate} ` +
+               `hideOfficial=${s.hideOfficialSubs} styleOverride=${s.styleOverride}`);
+    lines.push(`mt      : configured=${page.mtConfigured ?? '-'} provider=${s.mtProvider} ` +
+               `target=${s.mtTarget} source=${s.mtSource || 'auto'}`);
+    lines.push('--- recent activity (most recent last) ---');
+    // Keep the most recent trace that fits (headroom reserved for the note + the
+    // Worker's ~4000 cap), trimming the oldest lines.
+    const header = lines.join('\n');
+    let tail = page.trace || '(none captured yet — reproduce the problem on the tab, then report again)';
+    const room = 3600 - header.length;
+    if (tail.length > room) tail = '…(older lines trimmed)\n' + tail.slice(-(room - 25));
+    return header + '\n' + tail;
+  }
+  lines.push('page    : (open the popup on a Crunchyroll video tab to attach activity)');
+  return lines.join('\n');
+}
+
+// Primary — send straight to the report endpoint (Discord).
+reportSend?.addEventListener('click', async () => {
+  if (!REPORT_ENDPOINT) {
+    reportSend.textContent = 'Reporting not configured';
+    setTimeout(() => { reportSend.textContent = 'Send a report'; }, 2500);
+    return;
+  }
+  reportSend.disabled = true;
+  reportSend.textContent = 'Sending…';
+  const note   = (reportNote?.value || '').trim();
+  const bundle = (note ? `note    : ${note}\n` : '') + await buildDiagnostics(toggleIncludeDiag.checked);
+  let ok = false;
+  try {
+    const resp = await fetch(REPORT_ENDPOINT, {
+      method:  'POST',
+      headers: reportHeaders(),
+      body:    JSON.stringify({ text: bundle }),
+    });
+    ok = resp.ok;
+  } catch (_) { ok = false; }
+  reportSend.disabled = false;
+  reportSend.textContent = ok ? '✓ Sent — thanks!' : '✗ Could not send';
+  reportSend.classList.toggle('ok', ok);
+  if (ok && reportNote) reportNote.value = '';
+  setTimeout(() => { reportSend.textContent = 'Send a report'; reportSend.classList.remove('ok'); }, 3000);
+});
+
+// ── Quick survey ─────────────────────────────────────────────────────────────
+// Voluntary, user-initiated, same worker pipeline as reports.  Payload is the
+// three answers plus (opt-in) a settings snapshot: schema booleans only — which
+// features are enabled — never history, titles, or identifiers.
+const surveySend = document.getElementById('surveySend');
+const surveyRate = document.getElementById('surveyRate');
+let surveyRating = 0;
+
+surveyRate?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-v]');
+  if (!btn) return;
+  surveyRating = Number(btn.dataset.v);
+  surveyRate.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b === btn));
+});
+
+surveySend?.addEventListener('click', async () => {
+  if (!REPORT_ENDPOINT) {
+    surveySend.textContent = 'Not configured';
+    setTimeout(() => { surveySend.textContent = 'Send survey'; }, 2500);
+    return;
+  }
+  const feats = [...document.querySelectorAll('.surveyFeat:checked')].map(c => c.value);
+  const note  = (document.getElementById('surveyNote')?.value || '').trim();
+  if (!feats.length && !note && !surveyRating) {
+    surveySend.textContent = 'Pick or write something first';
+    setTimeout(() => { surveySend.textContent = 'Send survey'; }, 2500);
+    return;
+  }
+  surveySend.disabled = true;
+  surveySend.textContent = 'Sending…';
+  const lines = [
+    'SURVEY — Better Subs for Crunchyroll',
+    `version : ${chrome.runtime.getManifest().version}`,
+    `platform: ${coarsePlatform()}`,
+    `uses    : ${feats.join(', ') || '-'}`,
+    `rating  : ${surveyRating ? surveyRating + '/5' : '-'}`,
+  ];
+  if (note) lines.push(`note    : ${note.slice(0, 1500)}`);
+  if (document.getElementById('surveySnapshot')?.checked) {
+    // Booleans from the settings schema only — a feature-flag picture, not data.
+    const s = await new Promise(res => chrome.storage.local.get(self.CRSubFix.settings.defaults(), res));
+    const flags = ['enabled','autoActivate','hideOfficialSubs','showDialogue','showSigns',
+                   'styleOverride','autoPauseLine','mtEnabled']
+      .map(k => `${k}=${!!s[k]}`).join(' ');
+    lines.push(`settings: ${flags}`);
+  }
+  let ok = false;
+  try {
+    const resp = await fetch(REPORT_ENDPOINT, {
+      method:  'POST',
+      headers: reportHeaders(),
+      body:    JSON.stringify({ text: lines.join('\n') }),
+    });
+    ok = resp.ok;
+  } catch (_) { ok = false; }
+  surveySend.disabled = false;
+  surveySend.textContent = ok ? '✓ Thank you!' : '✗ Could not send';
+  surveySend.classList.toggle('ok', ok);
+  setTimeout(() => { surveySend.textContent = 'Send survey'; surveySend.classList.remove('ok'); }, 3000);
+});
+
+// Secondary — open a pre-filled public GitHub issue (the user submits it).
+reportGithub?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  const bundle = await buildDiagnostics(toggleIncludeDiag.checked);
+  let copied = false;
+  try { await navigator.clipboard.writeText(bundle); copied = true; } catch (_) {}
+  const body =
+    "**What's wrong?**\n\n\n" +
+    "**Steps to reproduce:**\n1. \n\n\n" +
+    `**Debug info** (${copied ? 'already copied to your clipboard — paste below' : 'paste below'}):\n\n` +
+    '```\n' + (copied ? '<paste here>' : bundle.slice(0, 1500)) + '\n```\n';
+  chrome.tabs.create({ url: `${ISSUES_URL}?body=${encodeURIComponent(body)}` });
+});
+
+// ── Version badge (header) ──────────────────────────────────────────────────
+try {
+  const verEl = document.getElementById('appVersion');
+  if (verEl) verEl.textContent = 'v' + chrome.runtime.getManifest().version;
+} catch (_) {}
+
+// ── Remember collapsible sections' open/closed state across popup opens ──────
+// The HTML ships all sections collapsed; once the user opens one (via a launcher
+// tile) we honour their choice next time.  UI-only state, so it lives in the
+// popup's own localStorage, not the settings schema.
+(function persistSectionState() {
+  const KEY = 'crSubFix_popupSections';
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) {}
+  for (const d of document.querySelectorAll('details[id]')) {
+    if (typeof saved[d.id] === 'boolean') d.open = saved[d.id];
+    d.addEventListener('toggle', () => {
+      saved[d.id] = d.open;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (_) {}
+    });
+  }
+})();
+
+// ── Section launcher tiles ───────────────────────────────────────────────────
+// A 2×2 tile grid opens one collapsible section at a time (accordion).  The
+// native <summary> headers are hidden (CSS .tiled), so the tiles are the entry
+// points; the active tile is highlighted to show which panel is open.
+(function initSectionTiles() {
+  const tiles = [...document.querySelectorAll('.stile')];
+  if (!tiles.length) return;
+  // Enforce one-at-a-time on load: a saved state from the pre-tiles popup could
+  // have several sections open, which the launcher treats as single-open.
+  const openTiles = tiles.filter((t) => document.getElementById(t.dataset.target)?.open);
+  openTiles.slice(1).forEach((t) => { const d = document.getElementById(t.dataset.target); if (d) d.open = false; });
+  const sync = () => {
+    for (const t of tiles) {
+      const d = document.getElementById(t.dataset.target);
+      t.classList.toggle('active', !!(d && d.open));
+    }
+  };
+  for (const t of tiles) {
+    t.addEventListener('click', () => {
+      const d = document.getElementById(t.dataset.target);
+      if (!d) return;
+      const willOpen = !d.open;
+      for (const other of tiles) {                     // accordion: one at a time
+        const od = document.getElementById(other.dataset.target);
+        if (od && od !== d) od.open = false;
+      }
+      d.open = willOpen;
+      sync();
+      if (willOpen) d.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
+  sync();
+})();

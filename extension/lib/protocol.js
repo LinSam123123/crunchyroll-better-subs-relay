@@ -1,0 +1,134 @@
+/**
+ * lib/protocol.js — single source of truth for the cross-world wire format.
+ *
+ * Three crossings need to agree on names:
+ *   1. content.js (isolated world) ↔ interceptor.js (MAIN world)
+ *      via DOM attributes on <html> and a token-guarded postMessage.
+ *   2. content.js ↔ background.js / popup.js
+ *      via chrome.runtime.sendMessage.
+ *   3. content.js ↔ chrome.storage settings
+ *      via the SETTINGS schema (lib/settings-schema.js owns those names).
+ *
+ * Settings attributes live in settings-schema.js.  Everything else lives here.
+ *
+ * Loaded into all four contexts (MAIN-world content_scripts, isolated-world
+ * content_scripts, popup, service worker) so any rename only touches one file.
+ */
+(function () {
+  'use strict';
+
+  // <html> data attributes shared between content.js and interceptor.js.
+  // JP_STATUS / JP_ACTIVE are written by interceptor.js, read by content.js;
+  // TOGGLE_TOKEN is written by interceptor.js and echoed by content.js inside
+  // its CR_SUB_TOGGLE postMessage.  It rejects accidental/unrelated messages of
+  // the same type; it is not a hard security boundary (interceptor runs in the
+  // MAIN world and writes the token to the page DOM, so a page script could read
+  // it).  The guarded action — toggling the subtitle overlay — is non-sensitive.
+  const ATTR = {
+    JP_STATUS:    'data-cr-jp-status',
+    JP_ACTIVE:    'data-cr-jp-active',
+    TOGGLE_TOKEN: 'data-cr-toggle-token',
+    // JSON-encoded {source, audio, remaster} populated by interceptor.js
+    // so the popup can show what's actually playing right now (active
+    // Source locale, audio dub locale, remaster state).  Updated on
+    // source/audio change and on remaster completion.
+    ACTIVE_INFO:  'data-cr-active-info',
+    // 'true' when a machine-translation API key is stored.  Set by content.js
+    // from chrome.storage — the KEY itself is never mirrored to the DOM (a page
+    // script could read it); only this derived boolean crosses into MAIN world.
+    MT_CONFIGURED: 'data-cr-mt-configured',
+  };
+
+  // Values written into ATTR.JP_STATUS by interceptor.js.  The popup reads this
+  // and renders a status pill; the badge reflects ATTR.JP_ACTIVE separately.
+  const STATUS = {
+    NONE:        'none',
+    READY:       'ready',
+    ACTIVE:      'active',
+    RELOAD:      'reload',
+    ERROR:       'error',
+    UNAVAILABLE: 'unavailable',
+  };
+
+  // chrome.runtime.sendMessage `type` values.
+  const MSG = {
+    TOGGLE_JP_CC: 'TOGGLE_JP_CC',     // background → content (keyboard shortcut)
+    GET_STATUS:   'GET_STATUS',       // popup       → content (status query)
+    GET_DIAG:     'GET_DIAGNOSTICS',  // popup       → content (issue-report bundle)
+    SET_BADGE:    'setBadge',         // content     → background (badge update)
+    MT_TRANSLATE: 'MT_TRANSLATE',     // content     → background (translate a batch)
+    MT_STREAM: 'MT_STREAM',
+    PUBLIC_SETTINGS: 'PUBLIC_SETTINGS',
+    SETTINGS_CHANGED: 'SETTINGS_CHANGED',
+    SET_PUBLIC_SETTING: 'SET_PUBLIC_SETTING',
+    MT_GET_CONFIG: 'MT_GET_CONFIG',
+    MT_SAVE_CONFIG: 'MT_SAVE_CONFIG',
+    MT_CLEAR_KEY: 'MT_CLEAR_KEY',
+    MT_TEST: 'MT_TEST',
+    MT_PROGRESS: 'MT_PROGRESS',
+    WORK_OPEN: 'WORK_OPEN',
+    WORK_UPDATE: 'WORK_UPDATE',
+    WORK_SNAPSHOT_GET: 'WORK_SNAPSHOT_GET',
+    WORK_CONTEXT: 'WORK_CONTEXT',
+    WORK_GET: 'WORK_GET',
+    WORK_SAVE: 'WORK_SAVE',
+    WORK_DELETE: 'WORK_DELETE',
+    WORK_GENERATE: 'WORK_GENERATE',
+    WORK_LOOKUP: 'WORK_LOOKUP',
+    WORK_ORGANIZE: 'WORK_ORGANIZE',
+    WORK_REVIEW_GET: 'WORK_REVIEW_GET',
+    WORK_REVIEW_SAVE: 'WORK_REVIEW_SAVE',
+    WORK_REVIEW_CHANGED: 'WORK_REVIEW_CHANGED',
+    WORK_PAGE_CHECK: 'WORK_PAGE_CHECK',
+    EXTERNAL_OPEN: 'EXTERNAL_OPEN',
+    EXTERNAL_GET: 'EXTERNAL_GET',
+    EXTERNAL_SEARCH: 'EXTERNAL_SEARCH',
+    EXTERNAL_DETAIL: 'EXTERNAL_DETAIL',
+    EXTERNAL_PREVIEW: 'EXTERNAL_PREVIEW',
+    EXTERNAL_DOWNLOAD_OPEN: 'EXTERNAL_DOWNLOAD_OPEN',
+    EXTERNAL_SET_HTTP: 'EXTERNAL_SET_HTTP',
+    EXTERNAL_FOLLOW_CLEAR: 'EXTERNAL_FOLLOW_CLEAR',
+    EXTERNAL_APPLY: 'EXTERNAL_APPLY',
+    EXTERNAL_TIME: 'EXTERNAL_TIME',
+    EXTERNAL_RESTORE: 'EXTERNAL_RESTORE',
+    EXTERNAL_SYNC: 'EXTERNAL_SYNC',
+    EXTERNAL_ACTIVE: 'EXTERNAL_ACTIVE',
+    EXTERNAL_FORGET: 'EXTERNAL_FORGET',
+    EXTERNAL_SAVE_KEY: 'EXTERNAL_SAVE_KEY',
+    EXTERNAL_CLEAR_KEY: 'EXTERNAL_CLEAR_KEY',
+    EXTERNAL_QUOTA: 'EXTERNAL_QUOTA',
+    EXTERNAL_NAMES: 'EXTERNAL_NAMES',
+    EXTERNAL_OFFICIAL_NAMES: 'EXTERNAL_OFFICIAL_NAMES',
+    EXTERNAL_ASSIST_CONFIG: 'EXTERNAL_ASSIST_CONFIG',
+    EXTERNAL_ASSIST_SAVE: 'EXTERNAL_ASSIST_SAVE',
+    EXTERNAL_ASSIST_CLEAR: 'EXTERNAL_ASSIST_CLEAR',
+    EXTERNAL_ASSIST: 'EXTERNAL_ASSIST',
+  };
+
+  // window.postMessage `type` values sent between content.js (isolated world)
+  // and interceptor.js (MAIN world).  CR_SUB_TOGGLE is the keyboard-shortcut
+  // relay; RPC_REQ/RPC_RES are a token-guarded request/response bridge that lets
+  // the MAIN world reach the service worker (which it can't address directly) —
+  // used for machine translation.  Each RPC carries a numeric `id` so concurrent
+  // calls correlate their responses.
+  const POST = {
+    CR_SUB_TOGGLE: 'CR_SUB_TOGGLE',  // content → MAIN: toggle overlay (token-guarded)
+    RPC_REQ:       'CR_SUB_RPC_REQ', // MAIN    → content: {id, method, payload, token}
+    RPC_RES:       'CR_SUB_RPC_RES', // content → MAIN: {id, ok, result?, error?}
+    REVIEW_CHANGED: 'CR_SUB_REVIEW_CHANGED',
+    EXTERNAL_APPLY: 'CR_SUB_EXTERNAL_APPLY',
+    EXTERNAL_ACK: 'CR_SUB_EXTERNAL_ACK',
+    SIGN_ASS:      'CR_SUB_SIGN_ASS',// MAIN    → content: {ass, token} — feed libass (signs) or null to clear
+    // MAIN → content: {key, value, token} — persist one settings-schema key to
+    // chrome.storage so a player-side toggle (e.g. the "Show" layer switches)
+    // survives reload and the popup reflects it.  content.js validates the key
+    // against the schema, so the page can't write arbitrary storage.
+    SET_SETTING:   'CR_SUB_SET_SETTING',
+  };
+
+  const protocol = { ATTR, STATUS, MSG, POST };
+
+  const NS = (typeof self !== 'undefined' ? self : globalThis);
+  NS.CRSubFix = NS.CRSubFix || {};
+  NS.CRSubFix.protocol = protocol;
+})();

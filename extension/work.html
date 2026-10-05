@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Better Subs · 作品资料</title>
+  <link rel="stylesheet" href="translation.css">
+  <link rel="stylesheet" href="work.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="36" height="36">
+    <div><h1>Better Subs</h1><p>作品资料</p></div>
+    <a class="settings-link" href="translation.html">翻译设置</a>
+  </header>
+  <main>
+    <p id="status" role="status" aria-live="polite">正在读取资料…</p>
+    <form id="work-form">
+      <fieldset id="fields" disabled>
+        <section>
+          <div class="section-heading"><h2>当前作品</h2><span id="state">未确认</span></div>
+          <dl><dt>页面识别</dt><dd id="detected"></dd><dt>字幕样本</dt><dd id="sample-count"></dd><dt>目标语言</dt><dd id="target"></dd></dl>
+          <label for="profiles">已保存资料</label>
+          <select id="profiles"><option value="">新建资料</option></select>
+          <label class="check work-toggle"><input id="enabled" type="checkbox">作品资料辅助翻译（全局）</label>
+          <label for="series-url">本作 Crunchyroll 系列链接</label>
+          <input id="series-url" type="url" maxlength="500" placeholder="https://www.crunchyroll.com/series/…" spellcheck="false">
+          <p id="scope" class="meta"></p>
+          <label for="title">作品名</label>
+          <input id="title" maxlength="200" required>
+          <label for="aliases">别名</label>
+          <input id="aliases" maxlength="500">
+          <div class="actions draft-actions"><button id="generate" type="button">生成候选资料（调用 API）</button><span id="model" class="meta"></span></div>
+          <p id="draft-warning" class="warning" hidden>模型候选资料，未经联网核实；尚未保存或用于翻译。</p>
+        </section>
+        <section id="lookup-section">
+          <h2>联网术语候选 · Bangumi</h2>
+          <label for="lookup-query">作品名 / 别名</label>
+          <div class="lookup-search">
+            <input id="lookup-query" maxlength="200" autocomplete="off">
+            <button id="lookup-search" type="button">查询作品</button>
+          </div>
+          <p id="lookup-status" class="meta" role="status" aria-live="polite">尚未查询</p>
+          <div id="lookup-subjects"></div>
+          <div id="lookup-terms" hidden>
+            <div class="section-heading"><h3 id="lookup-title"></h3><a id="lookup-source" target="_blank" rel="noopener noreferrer">作品来源</a></div>
+            <div class="actions"><button id="lookup-organize" type="button" class="primary">用联网资料整理草稿（调用 API）</button></div>
+            <p id="organize-summary" class="meta" role="status"></p>
+            <div id="organized-reference" hidden>
+              <h3>模型整理预览 · 尚未合并</h3>
+              <label class="check"><input id="adopt-context" type="checkbox">采用候选背景</label>
+              <textarea id="organized-context" rows="3" maxlength="1500" aria-label="候选背景"></textarea>
+              <label class="check"><input id="adopt-tone" type="checkbox">采用候选对白风格</label>
+              <textarea id="organized-tone" rows="2" maxlength="600" aria-label="候选对白风格"></textarea>
+            </div>
+            <div class="lookup-filters">
+              <label class="check"><input id="lookup-matched" type="checkbox" checked>仅显示本集匹配 / 已有术语</label>
+              <label class="check"><input id="lookup-replace" type="checkbox">允许替换冲突译名</label>
+            </div>
+            <div id="lookup-rows"></div>
+            <div class="actions lookup-actions">
+              <button id="lookup-more" type="button" hidden>加载更多角色</button>
+              <button id="lookup-retry" type="button" hidden>重试未完整页</button>
+              <button id="lookup-merge" type="button">合并勾选项到草稿</button>
+              <button id="lookup-discard" type="button">放弃本次候选</button>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2>翻译参考</h2>
+          <label for="context">背景与已知关系</label>
+          <textarea id="context" rows="4" maxlength="1500"></textarea>
+          <label for="tone">对白风格</label>
+          <textarea id="tone" rows="3" maxlength="600"></textarea>
+          <label for="glossary">本作术语表（JSON）</label>
+          <textarea id="glossary" rows="7" maxlength="10000" spellcheck="false" placeholder="{}"></textarea>
+          <details id="glossary-editor">
+            <summary>逐项编辑草稿术语</summary>
+            <p id="glossary-status" class="meta" role="status"></p>
+            <div id="glossary-entries"></div>
+          </details>
+          <details id="term-sources" hidden><summary>术语来源记录</summary><ul id="term-source-list"></ul></details>
+          <details id="coverage-section">
+            <summary>本集疑似专名覆盖</summary>
+            <div class="actions"><button id="coverage-check" type="button">检查当前草稿</button></div>
+            <p id="coverage-summary" class="meta" role="status"></p>
+            <p class="meta">启发式候选可能误报或漏报；草稿检查不代表已发送给模型。</p>
+            <div id="coverage-rows"></div>
+          </details>
+        </section>
+        <p id="save-summary" class="meta" role="status"></p>
+        <div class="actions">
+          <button id="save" type="submit" class="primary">确认并保存</button>
+          <button id="delete" type="button" class="danger" disabled>删除资料</button>
+        </div>
+      </fieldset>
+    </form>
+    <section id="review-section">
+      <div class="section-heading"><h2>本集翻译核对</h2><button id="review-refresh" type="button">刷新本地记录</button></div>
+      <p id="review-status" class="meta" role="status" aria-live="polite">未读取本地请求记录</p>
+      <label for="review-runs">请求记录</label>
+      <select id="review-runs"></select>
+      <div id="review-content" hidden>
+        <p id="review-summary" class="meta"></p>
+        <details id="review-details">
+          <summary>实际使用的作品资料与词表</summary>
+          <dl><dt>作品 / 版本</dt><dd id="review-profile"></dd><dt>模型 / 模式</dt><dd id="review-model"></dd></dl>
+          <p id="review-reference" class="review-source"></p>
+          <pre id="review-glossary"></pre>
+          <p id="review-origins" class="meta"></p>
+        </details>
+        <label for="review-filter">显示条目</label>
+        <select id="review-filter"><option value="issues">待核对</option><option value="all">全部</option><option value="corrected">已手动修正</option></select>
+        <label for="review-query">原文 / 译文</label>
+        <div class="lookup-search"><input id="review-query" type="search" maxlength="200"><button id="review-search" type="button">筛选</button></div>
+        <div id="review-rows"></div>
+        <div class="actions review-pages"><button id="review-prev" type="button">上一页</button><span id="review-page" class="meta"></span><button id="review-next" type="button">下一页</button></div>
+        <p class="meta">仅已完成且缓存有效的对白可手动修正；不自动重译、不修改词表。告示仅供核对。</p>
+      </div>
+    </section>
+    <footer>候选资料可能识别错误或包含剧透，请核对后确认。生成调用当前中转模型，可能计费，不自动重试。<br>修改资料不自动重译；之后手动翻译可能产生新费用。<br><a href="work.html">已保存资料</a></footer>
+  </main>
+  <script src="lib/protocol.js"></script>
+  <script src="lib/work-lookup.js"></script>
+  <script src="lib/work-profiles.js"></script>
+  <script src="lib/translation-review.js"></script>
+  <script src="work-lookup-ui.js"></script>
+  <script src="work-review-ui.js"></script>
+  <script src="work.js"></script>
+</body>
+</html>

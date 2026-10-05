@@ -1,0 +1,67 @@
+:root { color-scheme: light dark; font: 14px/1.5 system-ui, "Microsoft YaHei", sans-serif; color: #23282b; background: #f6f8f8; }
+* { box-sizing: border-box; letter-spacing: 0; }
+body { margin: 0; }
+header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px 24px; background: #fff; border-bottom: 1px solid #ccd4d6; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 17px; margin: 16px 0 10px; overflow-wrap: anywhere; }
+a { color: #087a75; }
+main { max-width: 1180px; padding: 14px 24px 32px; margin: auto; }
+fieldset, section, details { margin: 0; padding: 14px 0; border: 0; border-bottom: 1px solid #ccd4d6; min-width: 0; }
+legend { padding: 10px 0 0; font-weight: 650; }
+summary { cursor: pointer; font-weight: 600; }
+details[open] .row { margin-top: 12px; }
+.row { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.row .row { margin: 0; }
+.spread { justify-content: space-between; align-items: center; }
+label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.grow { flex: 1 1 230px; }
+.number { flex: 0 0 72px; }
+.check { flex-direction: row; align-items: center; min-height: 36px; }
+input, select, button, .file { min-height: 36px; font: inherit; color: inherit; }
+input, select { width: 100%; background: #fff; border: 1px solid #aab8bb; border-radius: 4px; padding: 6px 9px; }
+input[type=checkbox] { width: 16px; min-height: 16px; flex-shrink: 0; accent-color: #087a75; }
+button, .file { display: inline-flex; justify-content: center; align-items: center; padding: 6px 12px; border: 1px solid #aab8bb; border-radius: 4px; background: #fff; cursor: pointer; }
+button:hover, .file:hover { background: #e9f1f0; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: #087a75; color: #fff; border-color: #087a75; }
+button.primary:hover { background: #08615e; }
+:focus-visible { outline: 2px solid #087a75; outline-offset: 2px; }
+.file { position: relative; overflow: hidden; }
+.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.muted { font-size: 12px; color: #5c696e; margin: 6px 0; }
+#status { min-height: 38px; margin: 0 0 6px; padding: 8px 0; overflow-wrap: anywhere; }
+#status[data-error=true] { color: #ad3036; }
+.candidate { padding: 12px 0; border-bottom: 1px solid #dbe1e2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; }
+.candidate strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.candidate.selected { border-left: 3px solid #087a75; padding-left: 10px; }
+.candidate .muted { overflow-wrap: anywhere; }
+.warning { color: #a45411; font-weight: 600; }
+.timing input { width: 120px; }
+.table-wrap { overflow: auto; max-height: 540px; border: 1px solid #ccd4d6; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #dbe1e2; vertical-align: top; }
+th { position: sticky; top: 0; background: #eff3f3; z-index: 1; }
+td:nth-child(-n+3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td:nth-child(4) { min-width: 160px; overflow-wrap: anywhere; white-space: pre-line; }
+td:last-child { white-space: nowrap; }
+.mark-buttons { display: flex; gap: 6px; }
+.mapping-table td:nth-child(3) { white-space: normal; overflow-wrap: anywhere; }
+.mapping-table td:nth-child(2) { width: 90px; }
+.mapping-table td:nth-child(1) { width: 65px; }
+#fileSection select, #nameCandidates { max-width: 100%; min-width: 0; }
+#groupInfo, #assistModel { overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  header { padding: 14px; } main { padding: 10px 14px 24px; }
+  .grow { flex-basis: 100%; } .candidate { grid-template-columns: minmax(0, 1fr); }
+  .candidate button { justify-self: start; } .timing { gap: 8px; }
+}
+@media (prefers-color-scheme: dark) {
+  :root { background: #171b1d; color: #e0e7e8; }
+  header, input, select, button, .file { background: #23292b; }
+  fieldset, section, details, header, .table-wrap { border-color: #465154; }
+  th { background: #30383b; } td, th, .candidate { border-color: #394346; }
+  .muted { color: #aab8bb; } a { color: #77d7c3; }
+  button:hover, .file:hover { background: #354340; }
+  #status[data-error=true] { color: #ff989c; } .warning { color: #f4b768; }
+}
