@@ -65,6 +65,11 @@
   const STORAGE  = NS.storage;
   const PARSER   = NS.parser;
   const UI       = NS.ui;
+  const t = (source, params) => NS.i18n?.t(source, params) ?? source;
+  const uiText = (el, source, params) => {
+    if (NS.playerI18n) NS.playerI18n.text(el, source, params);
+    else el.textContent = t(source, params);
+  };
   const EP       = NS.episode;
   const PROTOCOL = NS.protocol;
   const CUE_STYLE = NS.cueStyle;
@@ -735,7 +740,7 @@
         state.reported = true;
         const reason = { FOLLOW_METADATA_REQUIRED: '季或集数未可靠识别', FOLLOW_NOT_FOUND: '合集缺少对应集或同版本文件',
           FOLLOW_AMBIGUOUS: '有多个对应文件', ASSRT_RATE_LIMIT: 'assrt 请求限速', SUBDL_RATE_LIMIT: 'SubDL 请求或下载限额' }[result.followError] || '下载或缓存失败';
-        showErrorToast(`字幕合集自动匹配未完成：${reason}。可在 Manage → 外部字幕中手动选择。`, openExternalSubs, '外部字幕');
+        showErrorToast(t('字幕合集自动匹配未完成：{reason}。可在 Manage → 外部字幕中手动选择。', { reason }), openExternalSubs, '外部字幕');
       }
       if (result?.record) {
         if (overlayActive && ep.activeSource() === result.record.id) return;
@@ -893,8 +898,8 @@
     UI.showToast({
       host: toastHost(),
       text: mtIds.length
-        ? `Cleared ${mtIds.length} machine translation${mtIds.length > 1 ? 's' : ''}`
-        : 'No machine translations to clear',
+        ? t('Cleared {count} machine translations', { count: mtIds.length })
+        : t('No machine translations to clear'),
       duration: 2800,
     });
   }
@@ -946,7 +951,7 @@
     log.info(`Upload auto-synced via [${best.lang}] — ${best.anchors.length} anchors, median ${delta.toFixed(1)}s.`);
     UI.showToast({
       host: toastHost(),
-      text: `Auto-synced to video (${delta >= 0 ? '+' : ''}${delta.toFixed(1)}s)`,
+      text: t('Auto-synced to video ({offset}s)', { offset: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}` }),
       duration: 4000,
     });
   }
@@ -1059,25 +1064,27 @@
       overflowWrap: 'anywhere', letterSpacing: '0',
     }));
     const { counts } = data;
-    const summary = [
-      `共 ${counts.total} 条`,
-      data.target_language ? `已译 ${counts.translated} 条` : '原文轨道',
-      counts.pending ? `未译 ${counts.pending} 条` : '',
-      counts.unknown ? `旧记录状态未知 ${counts.unknown} 条` : '',
-      counts.missing_source ? `原文缺失 ${counts.missing_source} 条` : '',
+    const summary = () => [
+      t('共 {count} 条', { count: counts.total }),
+      data.target_language ? t('已译 {count} 条', { count: counts.translated }) : t('原文轨道'),
+      counts.pending ? t('未译 {count} 条', { count: counts.pending }) : '',
+      counts.unknown ? t('旧记录状态未知 {count} 条', { count: counts.unknown }) : '',
+      counts.missing_source ? t('原文缺失 {count} 条', { count: counts.missing_source }) : '',
     ].filter(Boolean).join(' · ');
     panel.innerHTML =
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
         '<strong id="cr-bsub-export-title" style="flex:1;font-size:15px">导出字幕</strong>' +
         '<span data-close></span></div>' +
-      `<div>${escapeHtml(data.track_label)}</div>` +
-      `<div style="color:${THEME.textDim};margin:4px 0">${escapeHtml(data.source_language || '未知语言')}` +
+      `<div data-i18n-ignore>${escapeHtml(data.track_label)}</div>` +
+      `<div style="color:${THEME.textDim};margin:4px 0">${escapeHtml(data.source_language || t('未知语言'))}` +
         `${data.target_language ? ' → ' + escapeHtml(data.target_language) : ''}</div>` +
-      `<div style="margin-bottom:14px">${escapeHtml(summary)}</div>` +
+      '<div data-summary style="margin-bottom:14px"></div>' +
       '<label for="cr-bsub-export-format">文件格式</label>' +
       '<select id="cr-bsub-export-format" style="display:block;width:100%;min-width:0;box-sizing:border-box;' +
         'margin:6px 0 16px;padding:8px;background:#202022;color:#eee;border:1px solid #666;border-radius:4px;font:inherit"></select>' +
       '<div data-actions style="display:flex;justify-content:flex-end"></div>';
+    panel._i18nRefresh = () => { panel.querySelector('[data-summary]').textContent = summary(); };
+    panel._i18nRefresh();
     const select = panel.querySelector('select');
     const formats = [
       ['csv', '校对表格 CSV'],
@@ -1088,15 +1095,15 @@
     ];
     for (const [value, label] of formats) {
       const option = document.createElement('option');
-      option.value = value; option.textContent = label;
+      option.value = value; uiText(option, label);
       option.disabled = (value === 'source' && !data.rows.some(r => r.source_text)) ||
         (value === 'target' && !counts.translated) ||
         (value === 'bilingual' && !data.target_language);
       select.appendChild(option);
     }
     const close = syncBtn('×');
-    close.setAttribute('aria-label', '关闭导出');
-    close.title = '关闭导出';
+    NS.playerI18n?.attr(close, 'aria-label', '关闭导出');
+    NS.playerI18n?.attr(close, 'title', '关闭导出');
     close.style.width = '30px'; close.style.height = '30px';
     close.addEventListener('click', closeExportPanel);
     panel.querySelector('[data-close]').appendChild(close);
@@ -1117,6 +1124,8 @@
         showErrorToast('字幕导出失败，请重试。');
       }
     });
+    NS.i18n?.localize(panel.querySelector('#cr-bsub-export-title'));
+    NS.i18n?.localize(panel.querySelector('label'));
     const mount = () => (document.fullscreenElement || document.body).appendChild(panel);
     const outside = e => { if (!panel.contains(e.target)) closeExportPanel(); };
     const keydown = e => {
@@ -1159,7 +1168,7 @@
 
   function syncBtn(label, accent) {
     const b = document.createElement('button');
-    b.textContent = label;
+    uiText(b, label);
     Object.assign(b.style, {
       background: accent ? THEME.accent : 'transparent',
       color:      accent ? THEME.accentText : THEME.text,
@@ -1234,14 +1243,15 @@
     panel.id = SYNC_PANEL_ID;
     Object.assign(panel.style, panelStyle({
       position: 'absolute', zIndex: '2147483646', padding: '12px 14px', width: '320px',
+      maxWidth: 'calc(100% - 16px)', maxHeight: '80vh', overflowY: 'auto', overflowWrap: 'anywhere',
     }));
     panel.innerHTML =
       `<div style="font-size:13px;font-weight:700;color:${THEME.accent};margin-bottom:2px;">Adjust sync</div>` +
       `<div style="font-size:11px;color:#9aa;line-height:1.4;margin-bottom:10px;">` +
         `Seek the video to where each line should appear, then mark it. Two points correct both offset and speed.</div>` +
-      `<div style="font-size:11px;color:#888;margin:4px 0 2px;">First line<span style="color:#bbb;"> · "${escapeHtml(preview(src[0].text))}"</span></div>` +
+      `<div style="font-size:11px;color:#888;margin:4px 0 2px;">First line<span data-i18n-ignore style="color:#bbb;"> · "${escapeHtml(preview(src[0].text))}"</span></div>` +
       `<div data-row="a" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"></div>` +
-      `<div style="font-size:11px;color:#888;margin:4px 0 2px;">Last line<span style="color:#bbb;"> · "${escapeHtml(preview(src[src.length - 1].text))}"</span></div>` +
+      `<div style="font-size:11px;color:#888;margin:4px 0 2px;">Last line<span data-i18n-ignore style="color:#bbb;"> · "${escapeHtml(preview(src[src.length - 1].text))}"</span></div>` +
       `<div data-row="b" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"></div>` +
       `<div data-row="nudge" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"></div>` +
       `<div data-row="foot" style="display:flex;align-items:center;gap:8px;justify-content:flex-end;"></div>`;
@@ -1257,17 +1267,19 @@
     const doneB  = syncBtn('Done', true);
 
     panel.querySelector('[data-row="a"]').append(setA, lblA);
+    for (const row of panel.querySelectorAll('[data-row]')) row.style.flexWrap = 'wrap';
     panel.querySelector('[data-row="b"]').append(setB, lblB);
     panel.querySelector('[data-row="nudge"]').append(shiftL, minus, plus);
     panel.querySelector('[data-row="foot"]').append(resetB, doneB);
+    NS.i18n?.localize(panel);
 
     function refresh() {
       lblA.textContent = fmtT(markA);
       lblB.textContent = fmtT(markB);
       const cur = ep.getCustomSource(record.id)?.sync;
       shiftL.textContent = cur?.mode === 'linear'
-        ? `shift ${cur.offset >= 0 ? '+' : ''}${cur.offset.toFixed(1)}s · ${cur.scale.toFixed(3)}×`
-        : 'no sync applied';
+        ? t('shift {offset}s · {scale}×', { offset: `${cur.offset >= 0 ? '+' : ''}${cur.offset.toFixed(1)}`, scale: cur.scale.toFixed(3) })
+        : t('no sync applied');
     }
 
     setA.addEventListener('click',  () => { markA = videoEl.currentTime; recompute(); });
@@ -1277,6 +1289,7 @@
     resetB.addEventListener('click', reset);
     doneB.addEventListener('click', closeSyncPanel);
     refresh();
+    panel._i18nRefresh = refresh;
 
     const mountTarget = document.fullscreenElement ?? videoEl.parentElement ?? document.body;
     if (mountTarget !== document.body && window.getComputedStyle(mountTarget).position === 'static') {
@@ -1334,6 +1347,7 @@
     panel.id = TIMING_PANEL_ID;
     Object.assign(panel.style, panelStyle({
       position: 'absolute', zIndex: '2147483646', padding: '12px 14px', width: '300px',
+      maxWidth: 'calc(100% - 16px)', maxHeight: '80vh', overflowY: 'auto', overflowWrap: 'anywhere',
     }));
     panel.innerHTML =
       `<div style="font-size:13px;font-weight:700;color:${THEME.accent};margin-bottom:2px;">Adjust timing</div>` +
@@ -1350,15 +1364,17 @@
     const readout = document.createElement('span');
     const minus   = syncBtn('−0.1s');
     const plus    = syncBtn('+0.1s');
-    const hint    = document.createElement('span'); hint.textContent = 'hold ⇧ for 0.5s';
+    const hint    = document.createElement('span'); uiText(hint, 'hold ⇧ for 0.5s');
     hint.style.cssText = 'font-size:10px;color:#888;margin-left:auto;';
     const resetB  = syncBtn('Reset');
     const doneB   = syncBtn('Done', true);
 
     panel.querySelector('[data-row="target"]').append(tgtPri, tgtSec, tgtBoth);
+    for (const row of panel.querySelectorAll('[data-row]')) row.style.flexWrap = 'wrap';
     panel.querySelector('[data-row="read"]').append(readout);
     panel.querySelector('[data-row="nudge"]').append(minus, plus, hint);
     panel.querySelector('[data-row="foot"]').append(resetB, doneB);
+    NS.i18n?.localize(panel);
 
     function styleTargetBtn(btn, on, enabled) {
       btn.disabled = !enabled;
@@ -1374,8 +1390,8 @@
       styleTargetBtn(tgtSec,  target === 'sec',  sec);
       styleTargetBtn(tgtBoth, target === 'both', sec);
       readout.innerHTML = sec
-        ? `Sub 1 <b style="color:#fff;">${fmt(_timing.pri)}</b> &nbsp;·&nbsp; Sub 2 <b style="color:#fff;">${fmt(_timing.sec)}</b>`
-        : `Sub 1 <b style="color:#fff;">${fmt(_timing.pri)}</b>`;
+        ? `${escapeHtml(t('Sub 1'))} <b style="color:#fff;">${fmt(_timing.pri)}</b> &nbsp;·&nbsp; ${escapeHtml(t('Sub 2'))} <b style="color:#fff;">${fmt(_timing.sec)}</b>`
+        : `${escapeHtml(t('Sub 1'))} <b style="color:#fff;">${fmt(_timing.pri)}</b>`;
     }
 
     const pick = (t) => () => { target = t; refresh(); };
@@ -1387,6 +1403,7 @@
     resetB.addEventListener('click', reset);
     doneB.addEventListener('click', closeTimingPanel);
     refresh();
+    panel._i18nRefresh = refresh;
 
     const mountTarget = document.fullscreenElement ?? videoEl.parentElement ?? document.body;
     if (mountTarget !== document.body && window.getComputedStyle(mountTarget).position === 'static') {
@@ -1400,6 +1417,21 @@
     _timingEscHandler = (e) => { if (e.key === 'Escape') closeTimingPanel(); };
     setTimeout(() => document.addEventListener('keydown', _timingEscHandler), 0);
   }
+
+  NS.i18n?.watch(() => {
+    for (const id of [SYNC_PANEL_ID, TIMING_PANEL_ID, TRANSLATE_PANEL_ID, TUNE_PANEL_ID]) {
+      const panel = document.getElementById(id);
+      if (panel) { NS.i18n.localize(panel); panel._i18nRefresh?.(); }
+    }
+    const exportPanel = document.getElementById('cr-bsub-export-panel');
+    if (exportPanel) {
+      NS.i18n.localize(exportPanel.querySelector('#cr-bsub-export-title'));
+      NS.i18n.localize(exportPanel.querySelector('label'));
+      exportPanel._i18nRefresh?.();
+    }
+    const button = document.getElementById('cr-jp-cc-btn');
+    if (button) applyButtonState(button, button.dataset.state || 'idle');
+  });
 
   // ── Machine translation (BYOK) ────────────────────────────────────────────
   // The MAIN world can't reach the service worker, so translation rides a
@@ -1513,18 +1545,18 @@
       NETWORK_UNKNOWN: 'Connection failed; the request may have been billed. Retry manually when ready.',
       timeout: 'The reply was not received; the request may have been billed. Retry manually when ready.',
     };
-    if (relayErrors[code]) return relayErrors[code];
-    if (/^HTTP_5\d\d$/.test(code || '')) return 'Upstream service failed; the request may have been billed. Retry manually when ready.';
-    if (code === 'no-key')         return 'Add a translation API key in the extension popup.';
-    if (code === 'timeout')        return 'Translation timed out — check your connection and try again.';
-    if (/403|401/.test(code || '')) return 'Translation rejected — check your API key.';
+    if (relayErrors[code]) return t(relayErrors[code]);
+    if (/^HTTP_5\d\d$/.test(code || '')) return t('Upstream service failed; the request may have been billed. Retry manually when ready.');
+    if (code === 'no-key')         return t('Add a translation API key in the extension popup.');
+    if (code === 'timeout')        return t('Translation timed out — check your connection and try again.');
+    if (/403|401/.test(code || '')) return t('Translation rejected — check your API key.');
     if (/429/.test(code || '')) {
       return /per day|\bday\b/i.test(code)
-        ? 'Daily free quota reached — resets ~midnight Pacific. Switch to DeepL or try tomorrow.'
-        : 'Rate limited — wait a minute and retry (free tiers are strict).';
+        ? t('Daily free quota reached — resets ~midnight Pacific. Switch to DeepL or try tomorrow.')
+        : t('Rate limited — wait a minute and retry (free tiers are strict).');
     }
-    if (/456/.test(code || ''))     return 'Translation quota reached for your key.';
-    return 'Translation failed — see the popup to check your key.';
+    if (/456/.test(code || ''))     return t('Translation quota reached for your key.');
+    return t('Translation failed — see the popup to check your key.');
   }
 
   // Choose the best CR track to translate FROM: the user's pref, else English,
@@ -1641,7 +1673,8 @@
     hud.start(() => translateToTarget(opts));
     try {
       const retained = opts?.checkpoint?.out.filter(t => typeof t === 'string').length || 0;
-      hud.update(retained, opts?.checkpoint?.out.length || 0, retained ? `Resuming ${retained} retained subtitles…` : 'Loading source subtitles…');
+      const describe = () => retained ? t('Resuming {count} retained subtitles…', { count: retained }) : t('Loading source subtitles…');
+      hud.update(retained, opts?.checkpoint?.out.length || 0, describe(), describe);
       setTranslateProgress(retained, opts?.checkpoint?.out.length || 0);
       log.info('Machine translation requested.');
       await runTranslation(opts, hud);
@@ -1649,7 +1682,8 @@
       const code = /^[A-Z][A-Z0-9_]*$/.test(e?.message || '') ? e.message : 'CLIENT_ERROR';
       // Exceptions before the first request must not vanish with the menu/HUD.
       log.error(`Machine translation stopped: ${code} (${e?.name || 'Error'}).`);
-      hud.error(`${mtErrorText(code)} [${code}]`, () => translateToTarget(opts));
+      const describe = () => `${mtErrorText(code)} [${code}]`;
+      hud.error(describe(), () => translateToTarget(opts), 'Retry', describe);
     } finally {
       hud.finish({ paused: _translatePause || _translateCancel });
       _translating = false;
@@ -1659,6 +1693,7 @@
     }
   }
   async function runTranslation(opts, hud) {
+    const progress = (done, count, describe) => hud.update(done, count, describe(), describe);
     const ep = currentEp();
     if (!ep) throw new Error('NO_EPISODE');
     if (!isMtEnabled() || !isMtConfigured()) {
@@ -1684,7 +1719,7 @@
     if (!source) throw new Error('SOURCE_TRACK_UNAVAILABLE');
     const sLabel = LOCALE_LABELS[source] ?? source;
 
-    if (!checkpoint) hud.update(0, 0, `Loading ${escapeHtml(sLabel)} → ${escapeHtml(tLabel)}…`);
+    if (!checkpoint) progress(0, 0, () => t('Loading {source} → {target}…', { source: sLabel, target: tLabel }));
 
     const fetched = checkpoint?.fetched ||
       await NS.mtUtils.withTimeout(fetchCuesForLocale(ep, source), 20000, 'SUBTITLE_FETCH_TIMEOUT');
@@ -1803,7 +1838,7 @@
     }
     function coverageLabel() {
       const until = NS.mtUtils.coverage(cues, out, videoEl?.currentTime || 0);
-      return `Ready through ${Math.floor(until / 60)}:${String(Math.floor(until % 60)).padStart(2, '0')}`;
+      return t('Ready through {time}', { time: `${Math.floor(until / 60)}:${String(Math.floor(until % 60)).padStart(2, '0')}` });
     }
     // Persist legacy/page-only results before new paid work, in bounded patches.
     if (!persisted && resumed) {
@@ -1817,13 +1852,14 @@
     }
     publish();
     if (!persisted && resumed) {
-      hud.error(`${mtErrorText('CACHE_SAVE_FAILED')} (${done}/${texts.length} retained) [CACHE_SAVE_FAILED]`,
-        () => translateToTarget({ target, provider, source, batchSize: TUNE.batch, checkpoint: resume }));
+      const describe = () => `${mtErrorText('CACHE_SAVE_FAILED')} (${done}/${texts.length} ${t('retained')}) [CACHE_SAVE_FAILED]`;
+      hud.error(describe(),
+        () => translateToTarget({ target, provider, source, batchSize: TUNE.batch, checkpoint: resume }), 'Retry', describe);
       return;
     }
-    const progressLabel = streaming ? `Episode stream; resumed ${resumed}; 1 request` :
-      `Resumed ${resumed}; batch <= ${TUNE.batch}; concurrency ${TUNE.concurrency || 1}`;
-    hud.update(done, texts.length, `${progressLabel}; ${coverageLabel()}`);
+    const progressLabel = () => streaming ? t('Episode stream; resumed {count}; 1 request', { count: resumed }) :
+      t('Resumed {count}; batch <= {batch}; concurrency {concurrency}', { count: resumed, batch: TUNE.batch, concurrency: TUNE.concurrency || 1 });
+    progress(done, texts.length, () => `${progressLabel()}; ${coverageLabel()}`);
     setTranslateProgress(done, texts.length);
     const runId = crypto.randomUUID();
     const started = Date.now();
@@ -1834,7 +1870,7 @@
       if (streaming && todo.length) {
         const expected = new Set(todo);
         const issues = new Map();
-        const issueLabel = () => issues.size ? `; ${issues.size} invalid item(s) pending retry` : '';
+        const issueLabel = () => issues.size ? '; ' + t('{count} invalid item(s) pending retry', { count: issues.size }) : '';
         const result = await rpcStream({
           items: todo.map(i => ({ id: String(i), text: texts[i] })),
           timings: todo.map(i => i < nDlg ? { start: cues[i].start, end: cues[i].end } : null),
@@ -1848,13 +1884,13 @@
           done++;
           publish();
           setTranslateProgress(done, texts.length);
-          hud.update(done, texts.length, `Episode stream; ${coverageLabel()}${issueLabel()} (${Math.round((Date.now() - started) / 1000)}s)`);
+          progress(done, texts.length, () => `${t('Episode stream')}; ${coverageLabel()}${issueLabel()} (${Math.round((Date.now() - started) / 1000)}s)`);
         }, () => stopped() ? 'STREAM_CANCELLED' : _translatePause ? 'STREAM_PAUSED' : null, TUNE.timeout, issue => {
           if (stopped()) return;
           if (!expected.has(issue.index)) throw new Error('INVALID_ITEM_ID');
           if (issue.resolved) issues.delete(issue.index);
           else issues.set(issue.index, issue.reason);
-          hud.update(done, texts.length, `Episode stream; ${coverageLabel()}${issueLabel()}`);
+          progress(done, texts.length, () => `${t('Episode stream')}; ${coverageLabel()}${issueLabel()}`);
         });
         failure = result.ok ? (done < texts.length ? 'INCOMPLETE_RESPONSE' : null) : result.error;
         failureDetails = result.details;
@@ -1870,8 +1906,8 @@
         paused: () => _translatePause,
         pace: PACE, stopped, sleep,
         send: (idxs, batchId, attempt) => {
-          hud.update(done, texts.length, attempt ? `Retry ${attempt} (1 request at a time); ${coverageLabel()}` :
-            `Translating ${escapeHtml(sLabel)}; ${coverageLabel()}; ${progressLabel}`);
+          progress(done, texts.length, () => attempt ? `${t('Retry {attempt} (1 request at a time)', { attempt })}; ${coverageLabel()}` :
+            `${t('Translating {source}', { source: sLabel })}; ${coverageLabel()}; ${progressLabel()}`);
           return rpc('translate', { texts: idxs.map(i => texts[i]), source, target, provider, configTag, workToken,
             cache: cachePayload, indices: idxs, timings: idxs.map(i => i < nDlg ? { start: cues[i].start, end: cues[i].end } : null),
             requestId: `${runId}:${batchId}` }, TUNE.timeout);
@@ -1883,7 +1919,7 @@
           done += idxs.length;
           publish();
           setTranslateProgress(done, texts.length);
-          hud.update(done, texts.length, `${coverageLabel()} (${Math.round((Date.now() - started) / 1000)}s)`);
+          progress(done, texts.length, () => `${coverageLabel()} (${Math.round((Date.now() - started) / 1000)}s)`);
           const savedBatch = await rpc('progress', { ...cachePayload, action: 'save',
             entries: idxs.map(index => ({ index, text: out[index] })) });
           if (!savedBatch?.ok) {
@@ -1898,7 +1934,7 @@
             chars: indices.reduce((n, i) => n + texts[i].length, 0) };
           metrics.push(row);
           log.info(`Translation batch: ${JSON.stringify(row)}`);
-          if (NS.mtUtils.retryable(metric.error)) hud.update(done, texts.length, 'Rate limited or busy; reducing to 1 request and waiting…');
+          if (NS.mtUtils.retryable(metric.error)) progress(done, texts.length, () => 'Rate limited or busy; reducing to 1 request and waiting…');
         },
       });
       failure = result.error;
@@ -1916,24 +1952,25 @@
       const code = /^[A-Z][A-Z0-9_]*$/.test(failure) || failure === 'timeout' ? failure : 'NETWORK_UNKNOWN';
       const split = !streaming && NS.mtUtils.splittable(code) && TUNE.batch > 1;
       const batchSize = split ? Math.max(1, Math.floor(TUNE.batch / 2)) : TUNE.batch;
-      const note = split ? ` Retry with at most ${batchSize} items per batch; additional charges may apply.` : '';
-      const retention = persisted ? 'saved' : 'retained in this page only; do not refresh';
+      const note = () => split ? ' ' + t('Retry with at most {count} items per batch; additional charges may apply.', { count: batchSize }) : '';
+      const retention = () => t(persisted ? 'saved' : 'retained in this page only; do not refresh');
       const counts = metrics.find(m => m.error === code && m.counts)?.counts;
       const reasons = { MISSING_TEXT: 'missing text', NOT_STRING: 'non-text value', EMPTY_TEXT: 'empty text',
         TEXT_TOO_LONG: 'text too long', SANITIZED_EMPTY: 'empty after formatting cleanup' };
       const affected = streaming && Array.isArray(failureDetails?.items) ? failureDetails.items.slice(0, 3)
         .filter(item => Number.isInteger(item?.index) && item.index >= 0 && item.index < texts.length && reasons[item.reason])
         .map(item => item.index < nDlg
-          ? `subtitle #${item.index + 1} at ${Math.floor(cues[item.index].start / 60)}:${String(Math.floor(cues[item.index].start % 60)).padStart(2, '0')} (${reasons[item.reason]})`
-          : `sign #${item.index - nDlg + 1} (${reasons[item.reason]})`) : [];
-      const detail = (counts ? ` Expected ${counts.expected}, received ${counts.received}.` : '') +
-        (affected.length ? ` Pending: ${affected.join('; ')}.` : '');
-      const description = streaming && code === 'INCOMPLETE_RESPONSE'
-        ? 'The episode stream ended early. Retry requests only missing items; additional charges may apply.'
+          ? t('subtitle #{index} at {time} ({reason})', { index: item.index + 1, time: `${Math.floor(cues[item.index].start / 60)}:${String(Math.floor(cues[item.index].start % 60)).padStart(2, '0')}`, reason: t(reasons[item.reason]) })
+          : t('sign #{index} ({reason})', { index: item.index - nDlg + 1, reason: t(reasons[item.reason]) })) : [];
+      const detail = (counts ? ' ' + t('Expected {expected}, received {received}.', counts) : '') +
+        (affected.length ? ' ' + t('Pending: {items}.', { items: affected.join('; ') }) : '');
+      const description = () => streaming && code === 'INCOMPLETE_RESPONSE'
+        ? t('The episode stream ended early. Retry requests only missing items; additional charges may apply.')
         : mtErrorText(code);
-      const mode = streaming ? 'episode stream' : `batch <= ${TUNE.batch}`;
-      hud.error(`${description}${detail} (${done}/${texts.length} ${retention}; resumed ${resumed}; ${mode})${note} [${code}]`,
-        () => translateToTarget({ target, provider, source, batchSize, checkpoint: resume }), split ? 'Retry smaller batches' : 'Retry');
+      const mode = () => streaming ? t('episode stream') : t('batch <= {count}', { count: TUNE.batch });
+      const describe = () => `${description()}${detail} (${done}/${texts.length} ${retention()}; ${t('resumed {count}', { count: resumed })}; ${mode()})${note()} [${code}]`;
+      hud.error(describe(),
+        () => translateToTarget({ target, provider, source, batchSize, checkpoint: resume }), split ? 'Retry smaller batches' : 'Retry', describe);
       return;
     }
     if (_translatePause && done < texts.length) return;
@@ -1985,7 +2022,7 @@
     sel.innerHTML = '';
     for (const [val, label] of opts) {
       const o = document.createElement('option');
-      o.value = val; o.textContent = label;
+      o.value = val; uiText(o, label);
       // Explicit dark bg + light text per option.  color-scheme:dark on the
       // <select> styles the CLOSED control, but the native option-list popup is
       // drawn light on Windows — leaving our light option text invisible on white
@@ -2020,6 +2057,7 @@
     panel.id = TRANSLATE_PANEL_ID;
     Object.assign(panel.style, panelStyle({
       position: 'absolute', zIndex: '2147483646', padding: '12px 14px', width: '300px',
+      maxWidth: 'calc(100% - 16px)', maxHeight: '80vh', overflowY: 'auto', overflowWrap: 'anywhere',
     }));
     panel.innerHTML =
       `<div style="font-size:13px;font-weight:700;color:${THEME.accent};margin-bottom:10px;">🌐 Translation settings</div>` +
@@ -2035,8 +2073,7 @@
     let target = getMtTarget();
     mtSetOptions(toSel,   MT_TARGET_OPTIONS,              target);
     mtSetOptions(fromSel, validSourceOptions(ep, target), getMtSourcePref() || '');
-    panel.querySelector('[data-row="prov"]').textContent =
-      `Engine: ${MT_PROVIDER_LABELS[getMtProvider()] ?? 'Relay'}`;
+    uiText(panel.querySelector('[data-row="prov"]'), 'Engine: {provider}', { provider: MT_PROVIDER_LABELS[getMtProvider()] ?? 'Relay' });
     // Persist on change so choices stick across episodes (no re-picking); rebuild
     // From when the target changes (can't translate a language into itself).
     toSel.addEventListener('change', () => {
@@ -2053,6 +2090,7 @@
     const cancelB = syncBtn('Done');
     const goB     = syncBtn('Translate', true);
     panel.querySelector('[data-row="foot"]').append(cancelB, goB);
+    NS.i18n?.localize(panel);
     cancelB.addEventListener('click', closeTranslatePanel);
     goB.addEventListener('click', () => {
       setMtPref('target', toSel.value);
@@ -2088,7 +2126,7 @@
     try { const v = parseFloat(localStorage.getItem(lsKey)); if (!isNaN(v)) cur = v; } catch (_) {}
     const head = document.createElement('div');
     head.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:2px;';
-    const lab = document.createElement('span'); lab.textContent = label;
+    const lab = document.createElement('span'); uiText(lab, label);
     const val = document.createElement('span'); val.textContent = cur + suffix; val.style.color = THEME.accent;
     head.append(lab, val);
     const range = document.createElement('input');
@@ -2113,7 +2151,7 @@
     }));
     const title = document.createElement('div');
     title.style.cssText = `font-size:13px;font-weight:700;color:${THEME.accent};margin-bottom:9px;cursor:move;`;
-    title.textContent = '🎚 Typeset tuning (signs) ⠿';
+    uiText(title, '🎚 Typeset tuning (signs) ⠿');
     panel.appendChild(title);
     panel.appendChild(tuneSlider('Perspective',  'crSubFix_persp',     300, 2200, 25,   1018, 'px'));
     panel.appendChild(tuneSlider('3-D strength',  'crSubFix_ts_3d',    0,   2,    0.05, 1,   '×'));
@@ -2122,7 +2160,7 @@
     panel.appendChild(tuneSlider('Sign size',     'crSubFix_signscale', 0.5, 1.3, 0.02, 0.9, '×'));
     const note = document.createElement('div');
     note.style.cssText = 'font-size:10px;color:#777;line-height:1.4;margin:2px 0 8px;';
-    note.textContent = '× = multiplier on the file’s value (1 = exact). Tell me the values you like and I’ll bake them in.';
+    uiText(note, '× = multiplier on the file’s value (1 = exact). Tell me the values you like and I’ll bake them in.');
     panel.appendChild(note);
     const foot = document.createElement('div');
     foot.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
@@ -2246,24 +2284,24 @@
       const d = stats.medianDelta;
       const dStr = d != null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}s` : '';
       hud.html(
-        `<div style="color:${THEME.accent};font-weight:700;">✓  Subtitles shifted ${dStr}</div>` +
+        `<div style="color:${THEME.accent};font-weight:700;">✓  ${escapeHtml(t('Subtitles shifted {offset}', { offset: dStr }))}</div>` +
         `<div style="color:rgba(255,255,255,0.45);font-size:10px;margin-top:2px;">` +
-          `approximate — estimated from ${stats.count} matching lines` +
+          escapeHtml(t('approximate — estimated from {count} matching lines', { count: stats.count })) +
         `</div>`,
         7000
       );
       return;
     }
 
-    const cached     = stats.cached ? ' · cached' : '';
+    const cached     = stats.cached ? ' ' + t('· cached') : '';
     const deltaStr   = stats.medianDelta != null
       ? `${stats.medianDelta >= 0 ? '+' : ''}${stats.medianDelta.toFixed(1)}s · `
       : '';
-    const bridgeStr  = stats.bridge ? ` via ${escapeHtml(String(stats.bridge))}` : '';
+    const bridgeStr  = stats.bridge ? ' ' + escapeHtml(t('via {language}', { language: String(stats.bridge) })) : '';
     hud.html(
       `<div style="color:${THEME.accent};font-weight:700;">✓  Auto-sync validated${bridgeStr}</div>` +
       `<div style="color:rgba(255,255,255,0.45);font-size:10px;margin-top:2px;">` +
-        `${deltaStr}${stats.count} anchors · ${stats.quality}% coverage${cached}` +
+        `${deltaStr}${escapeHtml(t('{count} anchors · {quality}% coverage', { count: stats.count, quality: stats.quality }))}${cached}` +
       `</div>`,
       7000
     );
@@ -2285,9 +2323,9 @@
     _exactSyncOffered.add(ep.guid);
     const label = LOCALE_LABELS[audio] ?? audio;
     const msg = appliedOffset
-      ? `Subtitles auto-shifted ~${Math.abs(appliedOffset).toFixed(1)}s to fit this dub.`
-      : `These subtitles may be out of sync with this dub.`;
-    showErrorToast(`${msg} For exact timing:`, () => selectSource(audio), `Use ${label} (CC)`);
+      ? t('Subtitles auto-shifted ~{offset}s to fit this dub.', { offset: Math.abs(appliedOffset).toFixed(1) })
+      : t('These subtitles may be out of sync with this dub.');
+    showErrorToast(`${msg} ${t('For exact timing:')}`, () => selectSource(audio), t('Use {language} (CC)', { language: t(label) }));
   }
 
   // ── Master remaster orchestrator ──────────────────────────────────────────
@@ -2384,7 +2422,7 @@
 
     // escapeHtml: bridge is a locale key from the page's playback JSON and
     // updateProgress lands in innerHTML — same treatment as the badge stats.
-    updateProgress(3, 8, `Fetching source ref  (${escapeHtml(String(bridge))})`);
+    updateProgress(3, 8, escapeHtml(t('Fetching source ref ({language})', { language: String(bridge) })));
     const srcBridgeCues = (bridge === srcLang && cues.length)
       ? cues
       : await fetchAndParseSubs(srcBridgeUrl);
@@ -2394,7 +2432,7 @@
       return;
     }
 
-    updateProgress(4, 8, `Fetching audio ref  (${escapeHtml(String(bridge))})`);
+    updateProgress(4, 8, escapeHtml(t('Fetching audio ref ({language})', { language: String(bridge) })));
     const refBridgeCues = await fetchAndParseSubs(refBridgeUrl);
     if (isStale()) return;
 
@@ -2438,7 +2476,7 @@
       return;
     }
 
-    updateProgress(6, 8, `Retiming ${cues.length} cues`);
+    updateProgress(6, 8, t('Retiming {count} cues', { count: cues.length }));
     const remastered = remasterCues(cues, anchorMap);
 
     updateProgress(7, 8, 'Validating coverage');
@@ -3589,12 +3627,12 @@
       // stack degrades to the spoken-language sub alone; say so instead of
       // leaving them wondering where the second band went.
       if (!plan.nativeAvailable && native) {
-        UI.showToast({ host: toastHost(), text: `${LOCALE_LABELS[native] ?? native} isn't available on this episode — showing ${audioLabel(audio)} only`, duration: 4000 });
+        UI.showToast({ host: toastHost(), text: t("{native} isn't available on this episode — showing {audio} only", { native: t(LOCALE_LABELS[native] ?? native), audio: t(audioLabel(audio)) }), duration: 4000 });
       }
     } else {
       log.info(`Learning mode: no audio-matched sub (audio=[${audio || '?'}]) — primary=[${plan.primary}].`);
       if (audio && !locales.includes(audio)) {
-        UI.showToast({ host: toastHost(), text: `No ${audioLabel(audio)} subtitles for this episode — showing your language only`, duration: 4000 });
+        UI.showToast({ host: toastHost(), text: t('No {audio} subtitles for this episode — showing your language only', { audio: t(audioLabel(audio)) }), duration: 4000 });
       }
     }
   }
@@ -3616,7 +3654,7 @@
     markLearnHintSeen();
     UI.showToast({
       host:     toastHost(),
-      text:     `Learning ${audioLabel(audio)}? Show ${audioLabel(audio)} + ${audioLabel(native)} subtitles together — ▾ menu › 📚 Learning mode`,
+      text:     t('Learning {audio}? Show {audio} + {native} subtitles together — ▾ menu › 📚 Learning mode', { audio: t(audioLabel(audio)), native: t(audioLabel(native)) }),
       duration: 8000,
     });
   }
@@ -3813,7 +3851,7 @@
   function showLanguageToast(nativeLocale) {
     if (!nativeLocale || EN_LOCALES_SET.has(nativeLocale)) return;
     const label = LOCALE_LABELS[nativeLocale] ?? nativeLocale;
-    UI.showToast({ host: renderer.element ?? document.body, text: `${label} subtitles` });
+    UI.showToast({ host: renderer.element ?? document.body, text: t('{language} subtitles', { language: label }) });
   }
 
   function toastHost() {
@@ -3877,12 +3915,16 @@
       pointerEvents: 'auto',
       opacity:       '1',
       transition:    'opacity 0.5s ease',
-      letterSpacing: '0.3px',
+      letterSpacing: '0',
+      maxWidth: 'calc(100% - 24px)',
+      boxSizing: 'border-box',
+      overflowWrap: 'anywhere',
+      flexWrap: 'wrap',
     });
     const span = document.createElement('span');
-    span.textContent = text;
+    uiText(span, text);
     const btn = document.createElement('button');
-    btn.textContent = actionLabel || 'Retry';
+    uiText(btn, actionLabel || 'Retry');
     Object.assign(btn.style, {
       background:   THEME.accent,
       color:        THEME.accentText,
@@ -4037,7 +4079,7 @@
       unavail: { text: 'No subs',    bg: 'transparent',     color: THEME.textMuted},
     };
     const s = S[state] ?? S.idle;
-    btn.textContent      = s.text;
+    btn.textContent      = t(s.text);
     btn.style.background = s.bg;
     btn.style.color      = s.color;
   }
@@ -4375,7 +4417,7 @@
           const hud = ensureHud();
           if (hud) {
             hud.html(
-              `<span style="color:#e55;">✗</span>  [${escapeHtml(lang)}] subtitle unavailable` +
+              `<span style="color:#e55;">✗</span>  ${escapeHtml(t('[{language}] subtitle unavailable', { language: lang }))}` +
               `<span style="color:rgba(255,255,255,0.4);font-size:10px;">` +
               ` — appears to be from a different title</span>`,
               8000
@@ -4592,7 +4634,8 @@
 
     const btn = document.createElement('button');
     btn.id    = BTN_ID;
-    btn.title = 'Toggle subtitles (C / Alt+J)';
+    NS.playerI18n?.attr(btn, 'title', 'Toggle subtitles (C / Alt+J)');
+    NS.playerI18n?.attr(btn, 'aria-label', 'Toggle subtitles (C / Alt+J)');
 
     const found = findControlsRow();
 
@@ -4834,11 +4877,11 @@
       // No font-family → inherit the player's typeface from <html>.
       `font-weight:500;font-size:13px;line-height:1.4;box-shadow:${THEME.panelShadow};`;
     const msg = document.createElement('span');
-    msg.textContent = '⚠ Better Subs hit an error. Send a quick report?';
+    uiText(msg, '⚠ Better Subs hit an error. Send a quick report?');
     const send = document.createElement('button');
-    send.textContent = 'Send';
+    uiText(send, 'Send');
     const dismiss = document.createElement('button');
-    dismiss.textContent = 'Dismiss';
+    uiText(dismiss, 'Dismiss');
     for (const b of [send, dismiss]) {
       b.type = 'button';
       b.style.cssText = `font-weight:600;font-size:12px;border-radius:6px;padding:5px 12px;cursor:pointer;border:1px solid ${THEME.panelEdge};background:rgba(255,255,255,0.06);color:${THEME.textDim};`;
@@ -4853,7 +4896,7 @@
     send.addEventListener('click', async () => {
       if (done) return; done = true;
       send.disabled = dismiss.disabled = true;
-      msg.textContent = 'Sending…';
+      uiText(msg, 'Sending…');
       let ok = false;
       try {
         const resp = await originalFetch(REPORT_ENDPOINT, {
@@ -4863,7 +4906,7 @@
         });
         ok = resp.ok;
       } catch (_) { ok = false; }
-      msg.textContent = ok ? '✓ Thanks — report sent.' : '✗ Could not send the report.';
+      uiText(msg, ok ? '✓ Thanks — report sent.' : '✗ Could not send the report.');
       send.style.display = dismiss.style.display = 'none';
       setTimeout(close, 2600);
     });

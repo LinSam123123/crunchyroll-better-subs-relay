@@ -6,6 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+async function uiText(page, source) {
+  return page.getByText(await page.evaluate(text => CRSubFix.i18n.t(text), source), { exact: true });
+}
+async function uiRole(page, role, source) {
+  return page.getByRole(role, { name: await page.evaluate(text => CRSubFix.i18n.t(text), source), exact: true });
+}
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const artifacts = path.join(root, 'artifacts');
@@ -114,7 +120,7 @@ let browser;
 try {
   browser = await chromium.launchPersistentContext(path.join(runDir, 'profile'), {
     executablePath: process.env.BROWSER_EXECUTABLE_PATH || chromium.executablePath(), headless: true,
-    ignoreDefaultArgs: ['--disable-extensions'],
+    ignoreDefaultArgs: ['--disable-extensions'], locale: 'zh-CN',
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     viewport: { width: 1180, height: 1000 },
   });
@@ -169,8 +175,8 @@ try {
   const watch = await browser.newPage();
   async function openExport() {
     await watch.locator('#cr-bsub-menu-btn').click();
-    await watch.getByText('Manage', { exact: true }).click();
-    await watch.getByText('⬇ Export subtitles…', { exact: true }).click();
+    await (await uiText(watch, 'Manage')).click();
+    await (await uiText(watch, '⬇ Export subtitles…')).click();
     await watch.getByRole('dialog', { name: '导出字幕' }).waitFor();
   }
   async function exportFile(format) {
@@ -242,11 +248,11 @@ try {
   responseDelay = 1200;
   peakRequests = 0;
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
   // Reproduce a remaster HUD's delayed fade racing with a new translation.
   await watch.evaluate(() => window.CRSubFix.ui.makeProgressHud(document.getElementById('player')).html('Sync finished', 100));
   const beforeTranslation = requests.length;
-  await watch.getByText('🌐 Translate', { exact: true }).click();
+  await (await uiText(watch, '🌐 Translate')).click();
   try {
     await watch.locator('#cr-bsub-progress').waitFor({ state: 'visible', timeout: 500 });
     assert.equal(await watch.locator('#cr-bsub-translation-hud').count(), 0);
@@ -256,7 +262,7 @@ try {
     // Open details only on request; pause waits for the already dispatched batch.
     while (requests.length === beforeTranslation) await new Promise(r => setTimeout(r, 30));
     await watch.locator('#cr-bsub-progress').click();
-    await watch.getByRole('button', { name: 'Pause translation', exact: true }).click();
+    await (await uiRole(watch, 'button', 'Pause translation')).click();
     await watch.waitForFunction(() => document.getElementById('cr-bsub-progress').dataset.state === 'paused');
     assert.equal(requests.length, beforeTranslation + 1);
     await watch.screenshot({ path: path.join(artifacts, 'translation-details.png') });
@@ -279,7 +285,7 @@ try {
     await watch.locator('#cr-bsub-translation-hud').waitFor({ state: 'detached' });
     await watch.locator('#cr-bsub-progress').evaluate(el => { el.parentElement.style.opacity = ''; });
     await watch.locator('#cr-bsub-progress').click();
-    await watch.getByRole('button', { name: 'Resume translation', exact: true }).click();
+    await (await uiRole(watch, 'button', 'Resume translation')).click();
     assert.equal(await watch.locator('#cr-bsub-translation-hud').count(), 0);
     await watch.screenshot({ path: path.join(artifacts, 'player-translating.png') });
     await watch.waitForFunction(() => window.CRSubFix.episode.current().listCustomSources().some(s => s.kind === 'mt'), null, { timeout: 10000 });
@@ -346,8 +352,8 @@ try {
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-configured') === 'true');
   await seedPlayer();
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
-  await watch.getByText('🌐 Translate', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
+  await (await uiText(watch, '🌐 Translate')).click();
   await watch.waitForFunction(() => window.CRSubFix.lastTranslationStats?.completed === 4);
   assert.equal(requests.length, beforeRestore);
   assert.equal(await watch.evaluate(() => window.CRSubFix.lastTranslationStats.resumed), 4);
@@ -358,8 +364,8 @@ try {
   }, sourceVtt);
   failText = 'Second subtitle.';
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
-  await watch.getByText('🌐 Translate', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
+  await (await uiText(watch, '🌐 Translate')).click();
   await watch.locator('#cr-bsub-progress[data-state="error"]').waitFor();
   await watch.locator('#cr-bsub-translation-notice').waitFor();
   assert.equal(await watch.locator('#cr-bsub-translation-hud').count(), 0);
@@ -390,7 +396,7 @@ try {
   assert.equal(await watch.locator('#cr-bsub-translation-hud').count(), 0);
   await watch.locator('#cr-bsub-progress').click();
   failText = '';
-  await watch.locator('#cr-bsub-translation-hud').getByRole('button', { name: 'Retry', exact: true }).click();
+  await watch.locator('#cr-bsub-translation-hud').getByRole('button', { name: await watch.evaluate(text => CRSubFix.i18n.t(text), 'Retry'), exact: true }).click();
   await watch.waitForFunction(() => window.CRSubFix.episode.current().listCustomSources().filter(s => s.kind === 'mt' && !s.incomplete).length === 2);
   // A captured native track can be exported without generating a translation.
   await watch.evaluate(() => {
@@ -423,8 +429,8 @@ try {
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-mode') === 'episode-stream');
   const runStream = async () => {
     await watch.locator('#cr-bsub-menu-btn').click();
-    await watch.getByText('Manage', { exact: true }).click();
-    await watch.getByText('🌐 Translate', { exact: true }).click();
+    await (await uiText(watch, 'Manage')).click();
+    await (await uiText(watch, '🌐 Translate')).click();
   };
   const beforeStream = requests.length;
   streamFailAfter = 2;
@@ -471,11 +477,11 @@ try {
   await watch.waitForFunction(() => window.CRSubFix.episode.current().listCustomSources()
     .some(s => s.incomplete && s.srcCues[0].translationStatus === 'translated'));
   await watch.locator('#cr-bsub-progress').click();
-  await watch.getByRole('button', { name: 'Pause translation', exact: true }).click();
+  await (await uiRole(watch, 'button', 'Pause translation')).click();
   await watch.waitForFunction(() => document.getElementById('cr-bsub-progress').dataset.state === 'paused');
   assert.equal(requests.length, beforeChatStream + 1);
   if (!await watch.locator('#cr-bsub-translation-hud').count()) await watch.locator('#cr-bsub-progress').click();
-  await watch.getByRole('button', { name: 'Resume translation', exact: true }).click();
+  await (await uiRole(watch, 'button', 'Resume translation')).click();
   await watch.waitForFunction(() => document.getElementById('cr-bsub-progress').dataset.state === 'complete', null, { timeout: 15000 });
   assert.equal(requests.length, beforeChatStream + 2);
   assert.equal(requests.at(-1).url, '/v1/chat/completions');
@@ -496,7 +502,8 @@ try {
   await watch.locator('#cr-bsub-progress').click();
   const invalidDetails = await watch.locator('#cr-bsub-translation-hud').textContent();
   assert.match(invalidDetails, /STREAM_ITEMS_PENDING/);
-  assert.match(invalidDetails, /subtitle #2 at 0:10 \(empty text\)/);
+  assert.ok(invalidDetails.includes(await watch.evaluate(() => CRSubFix.i18n.t(
+    'subtitle #{index} at {time} ({reason})', { index: 2, time: '0:10', reason: CRSubFix.i18n.t('empty text') }))));
   await watch.screenshot({ path: path.join(artifacts, 'stream-invalid-item.png') });
   await watch.keyboard.press('Escape');
   await openExport();
@@ -508,7 +515,7 @@ try {
   await watch.keyboard.press('Escape');
   await watch.locator('#cr-bsub-progress').click();
   streamInvalidId = null;
-  await watch.getByRole('button', { name: 'Retry', exact: true }).click();
+  await (await uiRole(watch, 'button', 'Retry')).click();
   await watch.locator('#cr-bsub-progress[data-state="complete"]').waitFor();
   assert.equal(requests.length, beforeInvalidStream + 2);
   assert.deepEqual(JSON.parse(requests.at(-1).body.messages[1].content).items.map(i => i.id), ['1']);
@@ -530,7 +537,7 @@ try {
   const beforeWork = requests.length;
   const workOpened = browser.waitForEvent('page');
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
   await watch.getByText('作品资料…', { exact: true }).click();
   const work = await workOpened;
   await work.waitForLoadState();
@@ -564,6 +571,14 @@ try {
   assert.match(await work.locator('#glossary-status').textContent(), /尚未保存/);
   const bareName = work.locator('.glossary-entry').filter({ hasText: /^Alya/ });
   await bareName.locator('input').fill('艾莉（测试）');
+  const unsavedTerms = await work.locator('#glossary').inputValue();
+  for (const language of ['en', 'ja', 'zh-Hant', 'zh-Hans']) {
+    await worker.evaluate(value => chrome.storage.local.set({ uiLanguage: value }), language);
+    await work.waitForFunction(value => document.documentElement.lang === value, language);
+    assert.equal(await work.locator('#glossary').inputValue(), unsavedTerms);
+    assert.equal(await bareName.locator('input').inputValue(), '艾莉（测试）');
+    assert.equal(requests.length, beforeGlossaryEditing, 'UI language changes must not call model');
+  }
   await bareName.getByRole('button', { name: '应用', exact: true }).click();
   assert.equal(JSON.parse(await work.locator('#glossary').inputValue()).Alya, '艾莉（测试）');
   assert.equal(requests.length, beforeGlossaryEditing);
@@ -772,7 +787,7 @@ try {
   await metadata('SLOW', 'SLOWSERIES');
   const beforeSlowOpen = requests.length;
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
   const slowOpened = browser.waitForEvent('page', { timeout: 4000 });
   await watch.getByText('作品资料…', { exact: true }).click();
   const slowWork = await slowOpened;

@@ -1,4 +1,4 @@
-importScripts('lib/protocol.js', 'lib/settings-schema.js', 'lib/relay.js', 'lib/relay-stream.js', 'lib/mt-utils.js', 'lib/progress-cache.js', 'lib/work-lookup.js', 'lib/work-profiles.js', 'lib/work-organizer.js', 'lib/translation-review.js', 'lib/subtitle-parser.js', 'lib/assrt.js', 'lib/fflate.js', 'lib/subdl.js', 'lib/jimaku.js', 'lib/episode-metadata.js', 'lib/collection-match.js', 'lib/search-names.js', 'lib/subtitle-assist.js', 'lib/external-cache.js', 'lib/external-subs.js');
+importScripts("lib/protocol.js", "lib/settings-schema.js", "lib/relay.js", "lib/relay-stream.js", "lib/mt-utils.js", "lib/progress-cache.js", "lib/work-lookup.js", "lib/work-profiles.js", "lib/work-organizer.js", "lib/translation-review.js", "lib/subtitle-parser.js", "lib/assrt.js", "lib/fflate.js", "lib/subdl.js", "lib/jimaku.js", "lib/episode-metadata.js", "lib/collection-match.js", "lib/search-names.js", "lib/subtitle-assist.js", "lib/external-cache.js", "lib/external-subs.js");
 const { MSG } = self.CRSubFix.protocol;
 const SETTINGS = self.CRSubFix.settings;
 const RELAY = self.CRSubFix.relay;
@@ -194,6 +194,7 @@ async function setPublicSetting(payload) {
     (entry.type === 'string' && (typeof value !== 'string' || value.length > 500))) throw new Error('INVALID_SETTING');
   if (entry.key === 'mtTarget' && !RELAY.LANGUAGES[value]) throw new Error('INVALID_LANGUAGE');
   if (entry.key === 'mtSource' && value !== '' && !RELAY.LANGUAGES[value]) throw new Error('INVALID_LANGUAGE');
+  if (entry.key === 'uiLanguage' && !['auto', 'zh-Hans', 'zh-Hant', 'en', 'ja'].includes(value)) throw new Error('INVALID_UI_LANGUAGE');
   await chrome.storage.local.set({ [entry.key]: value });
   return { ok: true };
 }

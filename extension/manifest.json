@@ -8,7 +8,7 @@
       "default_title": "Better Subs Relay (Unofficial Beta)"
    },
    "background": {
-      "service_worker": "background.js"
+      "service_worker": "background-worker.js"
    },
    "commands": {
       "toggle-jp-cc": {
@@ -19,12 +19,12 @@
       }
    },
    "content_scripts": [ {
-      "js": [ "lib/settings-schema.js", "lib/protocol.js", "lib/config.js", "lib/ui-theme.js", "lib/storage.js", "lib/playback-api.js", "lib/subtitle-parser.js", "lib/sign-track.js", "lib/custom-source.js", "lib/subtitle-catalog.js", "lib/episode.js", "lib/overlay-ui.js", "lib/translation-status.js", "lib/cue-style.js", "lib/cue-renderer.js", "lib/sub-suppression.js", "lib/wrong-title.js", "lib/remaster.js", "lib/sub-sync.js", "lib/source-menu.js", "lib/mt-utils.js", "lib/subtitle-export.js", "interceptor.js" ],
+      "js": [ "lib/settings-schema.js", "lib/protocol.js", "lib/i18n.js", "lib/i18n-player.js", "lib/config.js", "lib/ui-theme.js", "lib/storage.js", "lib/playback-api.js", "lib/subtitle-parser.js", "lib/sign-track.js", "lib/custom-source.js", "lib/subtitle-catalog.js", "lib/episode.js", "lib/overlay-ui.js", "lib/translation-status.js", "lib/cue-style.js", "lib/cue-renderer.js", "lib/sub-suppression.js", "lib/wrong-title.js", "lib/remaster.js", "lib/sub-sync.js", "lib/source-menu.js", "lib/mt-utils.js", "lib/subtitle-export.js", "interceptor.js" ],
       "matches": [ "*://www.crunchyroll.com/*" ],
       "run_at": "document_start",
       "world": "MAIN"
    }, {
-      "js": [ "lib/iso-bundle.js", "lib/work-profiles.js", "lib/episode-metadata.js", "lib/search-names.js", "lib/octopus/subtitles-octopus.js", "content.js" ],
+      "js": [ "lib/iso-bundle.js", "lib/i18n.js", "lib/i18n-player.js", "lib/work-profiles.js", "lib/episode-metadata.js", "lib/search-names.js", "lib/octopus/subtitles-octopus.js", "content.js" ],
       "matches": [ "*://www.crunchyroll.com/*" ],
       "run_at": "document_start"
    } ],
@@ -43,8 +43,8 @@
    "options_page": "translation.html",
    "optional_host_permissions": [ "https://*/*", "http://*.assrt.net/*", "http://localhost/*", "http://127.0.0.1/*" ],
    "permissions": [ "storage", "webRequest" ],
-   "version": "2.7.0.30",
-   "version_name": "2.7.0 + Relay 30 Beta",
+   "version": "2.7.0.32",
+   "version_name": "2.7.0 + Relay 32 Beta",
    "web_accessible_resources": [ {
       "matches": [ "*://www.crunchyroll.com/*" ],
       "resources": [ "lib/octopus/subtitles-octopus-worker.js", "lib/octopus/subtitles-octopus-worker.wasm", "lib/octopus/Tinos-Regular.ttf", "lib/octopus/Arimo.ttf", "lib/octopus/Cousine-Regular.ttf" ]

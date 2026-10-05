@@ -2,7 +2,7 @@
 
 ## Purpose and User Setup
 
-This is an unofficial Manifest V3 Chromium extension for Crunchyroll, not a player, subtitle distributor, subscription bypass, or hosted translation service. Read README.md (Chinese) or README.ja.md (Japanese) before helping a user install it. The UI is mainly Chinese/English. Load the `extension/` directory unpacked in Edge/Chrome; disable competing subtitle extensions and reload the playback tab. A user's own subscription/permissions are required.
+This is an unofficial Manifest V3 Chromium extension for Crunchyroll, not a player, subtitle distributor, subscription bypass, or hosted translation service. Read README.md (Chinese) or README.ja.md (Japanese) before helping a user install it. UI languages: Simplified Chinese, Traditional Chinese, English and Japanese. Load the `extension/` directory unpacked in Edge/Chrome; disable competing subtitle extensions and reload the playback tab. A user's own subscription/permissions are required.
 
 Choose official tracks first. For external subtitles, configure each source's own key, confirm series/season/episode, choose directory -> release version -> current episode -> preview -> apply. Following a collection is explicit and retains the confirmed release and offset. For machine translation, configure DeepL or an OpenAI-compatible provider, then start translation manually. AI title/file analysis is optional, may use a separate provider, and always produces candidates for confirmation. Never request keys in chat or public issues; guide users to enter them locally.
 
@@ -37,16 +37,19 @@ Optional browser regressions use Playwright in isolated profiles and mock pages/
 ```sh
 npm run test:browser
 npm run test:external-browser
+npm run test:i18n-browser
+npm run test:worker-upgrade
 ```
 
 Generated profiles/screenshots stay in ignored `artifacts/`; do not publish them by default. A passing mock suite does not establish end-to-end success against real Crunchyroll accounts, every provider, or every episode.
 
 ## Architecture Map
 
-- `extension/background.js`: trusted worker, settings/permissions, API calls, translation progress, source orchestration and bridge routing.
+- `extension/background.js`: trusted worker source, settings/permissions, API calls, translation progress, source orchestration and bridge routing. The manifest loads generated `background-worker.js`, which bundles startup dependencies without runtime `importScripts` fetches.
 - `extension/content.js`: isolated-world bridge, playback identity/metadata and subtitle overlay integration.
 - `extension/interceptor.js`: MAIN-world playback interception and player controls. Never receives raw API keys.
 - `extension/lib/protocol.js`, `settings-schema.js`, `storage.js`: cross-context contracts, validation and trusted settings/storage boundaries.
+- `extension/lib/i18n.js`, `i18n-*.js`: bundled UI catalogs. `uiLanguage` is independent of subtitle target/source and provider configuration. Never translate data, prompts or user inputs to localize UI. Add catalog entries and use `t()` for dynamic labels; use `localize()` only on extension-owned UI. MAIN-world locale follows the allowlisted settings attribute, not direct storage access. No remote translation or broad website DOM observer.
 - `extension/lib/relay.js`, `mt-utils.js`, `relay-stream.js`: provider payloads, stable cue IDs, retries, batching/concurrency and SSE parsing. Check existing exports before edits.
 - `extension/lib/subtitle-parser.js`, `cue-renderer.js`, `cue-style.js`, `lib/octopus/`: subtitle parsing/rendering. Existing upstream byte-retention tests are intentional. Zero-duration ASS effects must not reject an otherwise valid track.
 - `extension/lib/assrt.js`, `subdl.js`, `jimaku.js`: provider-specific search/detail/download validation. assrt HTTP200 may still mean business error; refresh expiring URLs before download. Jimaku Authorization is its raw key, not Bearer. Do not cache signed URLs.
@@ -62,7 +65,7 @@ No frontend framework/bundler is required. Modules use existing `CRSubFix` names
 
 ## Generated Assets and Provenance
 
-Edit `settings-schema.js` and `protocol.js`, not `lib/iso-bundle.js`. `tools/build.mjs` regenerates the isolated bundle and vendored fflate/OpenCC files + license texts. No inline scripts or remote executable scripts are allowed on extension pages.
+Edit `background.js`, `settings-schema.js` and `protocol.js`, not generated `background-worker.js` or `lib/iso-bundle.js`. `tools/build.mjs` regenerates both bundles and vendored fflate/OpenCC files + license texts. The worker source's first-line `importScripts` list uses double-quoted JSON-compatible local paths as its build declaration. No inline scripts or remote executable scripts are allowed on extension pages.
 
 `upstream-files.json` records original store 2.7.0 hashes. This is not the latest store build or a byte-identical GitHub main checkout. Attribution is in NOTICE.md; third-party exceptions are in THIRD_PARTY_NOTICES.md. Keep renderer replacement/relinking instructions and source references available with binary releases.
 
@@ -72,5 +75,5 @@ Edit `settings-schema.js` and `protocol.js`, not `lib/iso-bundle.js`. `tools/bui
 2. Validate stable cue IDs, out-of-order streams, partial-progress resume, cancellation, timeout/429, per-work identity, permissions and error sanitization when those surfaces change.
 3. Follow changes must test title/hash variation, format/platform/revision isolation, ambiguous/missing episodes, next/previous navigation, offset inheritance and stale metadata.
 4. Run build, unit tests, privacy scan, relevant browser suites. Report precisely what was tested and what was not.
-5. Keep package/manifest versions consistent: `2.7.0.30` maps to package `2.7.0-relay.30`. Rebuild and package; scan archive/attachments and reachable Git history, not just the working tree.
+5. Keep package/manifest versions consistent: `2.7.0.32` maps to package `2.7.0-relay.32`. Rebuild and package; scan archive/attachments and reachable Git history, not just the working tree.
 6. Publish only reviewed source and release artifacts. Do not upload ignored directories, real samples or another repository's history. Never claim automated scanning proves absolute absence of secrets.

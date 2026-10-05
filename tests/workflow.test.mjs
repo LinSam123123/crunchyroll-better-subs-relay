@@ -71,6 +71,10 @@ function workflow(options = {}) {
     },
   });
   load(ctx, 'lib/mt-utils.js');
+  load(ctx, 'lib/i18n.js');
+  load(ctx, 'lib/i18n-player.js');
+  ctx.CRSubFix.i18n.setLanguage('en');
+  ctx.t = ctx.CRSubFix.i18n.t;
   ctx.NS = ctx.CRSubFix;
   const code = source('interceptor.js');
   vm.runInContext(code.slice(code.indexOf('  const MT_PARTIAL_TTL'), code.indexOf('  const TRANSLATE_PANEL_ID')) +

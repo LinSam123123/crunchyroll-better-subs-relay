@@ -8,6 +8,9 @@ import vm from 'node:vm';
 import { zipSync, strToU8 } from 'fflate';
 
 const require = createRequire(import.meta.url);
+async function uiText(page, source) {
+  return page.getByText(await page.evaluate(text => CRSubFix.i18n.t(text), source), { exact: true });
+}
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const artifacts = path.join(root, 'artifacts');
@@ -133,7 +136,7 @@ let browser, externalPage;
 try {
   browser = await chromium.launchPersistentContext(path.join(runDir, 'profile'), {
     executablePath: process.env.BROWSER_EXECUTABLE_PATH || chromium.executablePath(), headless: true,
-    ignoreDefaultArgs: ['--disable-extensions'],
+    ignoreDefaultArgs: ['--disable-extensions'], locale: 'zh-CN',
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     viewport: { width: 1180, height: 900 },
   });
@@ -243,6 +246,7 @@ try {
   const watch = await browser.newPage();
   await watch.goto('https://www.crunchyroll.com/zh-tw/watch/TEST/title');
   await watch.locator('#cr-bsub-menu-btn').waitFor({ timeout: 15000 });
+  await watch.waitForFunction(() => CRSubFix.episode.current()?.guid === 'TEST');
   // Isolated and MAIN worlds have separate JS wrappers; simulate native media
   // time in both without bypassing the real runtime captureTime message.
   const cdp = await browser.newCDPSession(watch), contexts = [];
@@ -253,10 +257,14 @@ try {
   await cdp.send('Runtime.evaluate', { contextId: isolated.id,
     expression: "Object.defineProperty(document.querySelector('video'),'currentTime',{configurable:true,get:()=>Number(document.querySelector('video').getAttribute('data-test-time')||0)})" });
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
   const newPage = browser.waitForEvent('page');
   await watch.getByText('外部字幕…', { exact: true }).click();
-  const page = await newPage;
+  const page = await newPage.catch(async error => {
+    const notice = await watch.evaluate(() => ({ text: document.body.innerText.slice(-1000),
+      guid: CRSubFix.episode.current()?.guid }));
+    throw new Error(`External page did not open: ${JSON.stringify(notice)}; page errors: ${JSON.stringify(errors)}; ${error.message}`);
+  });
   externalPage = page;
   await page.waitForFunction(() => !document.getElementById('identity').disabled);
   assert.equal(await page.locator('#title').inputValue(), '模拟学园');
@@ -315,6 +323,22 @@ try {
   await page.waitForFunction(() => document.getElementById('marks').textContent.includes('B：'));
   assert.equal(await page.locator('#scale').inputValue(), '1');
   assert.equal(await page.locator('#offset').inputValue(), '5');
+  const selectedFileBeforeLanguage = await page.locator('#files').inputValue();
+  const beforeLanguageRequests = calls.length;
+  const subtitleCell = page.locator('#cues tr').last().locator('td').nth(3);
+  const subtitleBefore = await subtitleCell.textContent();
+  await subtitleCell.evaluate(node => { node.textContent = '保存'; });
+  for (const language of ['en', 'ja', 'zh-Hant', 'zh-Hans']) {
+    await worker.evaluate(value => chrome.storage.local.set({ uiLanguage: value }), language);
+    await page.waitForFunction(value => document.documentElement.lang === value, language);
+    assert.equal(await page.locator('#files').inputValue(), selectedFileBeforeLanguage);
+    assert.equal(await page.locator('#offset').inputValue(), '5');
+    assert.ok((await page.locator('#cues').textContent()).includes('第一句话'));
+    assert.equal(await subtitleCell.textContent(), '保存', 'A subtitle matching a UI label must remain untouched');
+  }
+  await subtitleCell.evaluate((node, text) => { node.textContent = text; }, subtitleBefore);
+  assert.equal(calls.length, beforeLanguageRequests, 'Language changes must not search, download or translate');
+  checks.push('Changing all four UI languages preserves selected file, timing and preview without network calls');
   await page.locator('#remember').check();
   await watch.evaluate(() => { window.__time = 7.2; document.querySelector('video').dispatchEvent(new Event('timeupdate')); });
   await page.locator('#apply').click();
@@ -323,8 +347,8 @@ try {
   checks.push('Two chosen cues capture player time; loaded cue is visible in actual renderer');
   let countBefore = calls.length;
   await watch.locator('#cr-bsub-menu-btn').click();
-  await watch.getByText('Manage', { exact: true }).click();
-  await watch.getByText('⚙ Adjust sync…', { exact: true }).click();
+  await (await uiText(watch, 'Manage')).click();
+  await (await uiText(watch, '⚙ Adjust sync…')).click();
   await watch.getByText('+0.1s', { exact: true }).click();
   await page.waitForTimeout(150);
   assert.equal((await worker.evaluate(() => self.CRSubFix.externalCache.create().get())).selections.TEST.sync.offset, 5.1);
@@ -489,7 +513,7 @@ try {
   assert.equal(calls.length - beforeFollow, 2);
   checks.push('SPA next-episode slug normalization and 7.5s-late metadata follow tagged ASS without refresh; player replacement recovers from the same result; no duplicate downloads');
   const followPagePromise = browser.waitForEvent('page');
-  await watch.locator('#cr-bsub-menu-btn').click(); await watch.getByText('Manage', { exact: true }).click();
+  await watch.locator('#cr-bsub-menu-btn').click(); await (await uiText(watch, 'Manage')).click();
   await watch.getByText('外部字幕…', { exact: true }).click();
   const followPage = await followPagePromise;
   await followPage.waitForFunction(() => !document.getElementById('previewSection').hidden);
@@ -523,7 +547,7 @@ try {
   await watch.goto('https://www.crunchyroll.com/zh-tw/watch/FOURTH/title');
   await watch.locator('#cr-bsub-menu-btn').waitFor();
   const subdlPagePromise = browser.waitForEvent('page');
-  await watch.locator('#cr-bsub-menu-btn').click(); await watch.getByText('Manage', { exact: true }).click();
+  await watch.locator('#cr-bsub-menu-btn').click(); await (await uiText(watch, 'Manage')).click();
   await watch.getByText('外部字幕…', { exact: true }).click();
   const subdlPage = await subdlPagePromise; externalPage = subdlPage;
   await subdlPage.waitForFunction(() => !document.getElementById('identity').disabled);
@@ -586,7 +610,7 @@ try {
   await watch.screenshot({ path: path.join(artifacts, 'subdl-follow-player.png') });
   checks.push('SubDL SPA follows same pack and language with inherited offset; reload uses cache without provider calls');
   const fifthPagePromise = browser.waitForEvent('page');
-  await watch.locator('#cr-bsub-menu-btn').click(); await watch.getByText('Manage', { exact: true }).click();
+  await watch.locator('#cr-bsub-menu-btn').click(); await (await uiText(watch, 'Manage')).click();
   await watch.getByText('外部字幕…', { exact: true }).click();
   const fifthPage = await fifthPagePromise; externalPage = fifthPage;
   await fifthPage.waitForFunction(() => !document.getElementById('previewSection').hidden);
@@ -704,7 +728,7 @@ try {
   await watch.goto('https://www.crunchyroll.com/zh-tw/watch/GX9UQEGM5/and-so-they-met');
   await watch.locator('#cr-bsub-menu-btn').waitFor();
   const identityPagePromise = browser.waitForEvent('page');
-  await watch.locator('#cr-bsub-menu-btn').click(); await watch.getByText('Manage', { exact: true }).click();
+  await watch.locator('#cr-bsub-menu-btn').click(); await (await uiText(watch, 'Manage')).click();
   await watch.getByText('外部字幕…', { exact: true }).click();
   const identityPage = await identityPagePromise; externalPage = identityPage;
   await identityPage.waitForFunction(() => !document.getElementById('identity').disabled);
@@ -815,7 +839,7 @@ try {
   assert.equal(followed.files.find(f => f.key === followed.selections.ALYAFOUR.key).name, alyaNetflix(4));
   assert.equal(calls.length - beforeAlyaFollow, 3);
   const reopenPromise = browser.waitForEvent('page');
-  await watch.locator('#cr-bsub-menu-btn').click(); await watch.getByText('Manage', { exact: true }).click();
+  await watch.locator('#cr-bsub-menu-btn').click(); await (await uiText(watch, 'Manage')).click();
   await watch.getByText('外部字幕…', { exact: true }).click();
   const reopened = await reopenPromise; externalPage = reopened;
   await reopened.waitForFunction(() => !document.getElementById('identity').disabled && !document.getElementById('previewSection').hidden);

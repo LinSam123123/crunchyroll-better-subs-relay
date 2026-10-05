@@ -8,5 +8,6 @@ Pull requests: explain the behavior change and tests; preserve original notices,
 
 Before publishing: `npm ci`, `npm run verify`, `npm run privacy`, relevant isolated browser tests, and `npm run package`. Review all changed files and reachable history; automated scanners do not replace human review. Keep private test inputs and credentials outside this repository.
 
-欢迎用中文、日语或英文反馈。请描述能复现的步骤，不要上传完整字幕或 Key。
+欢迎用中文、日语、英文或韩语反馈。请描述能复现的步骤，不要上传完整字幕或 Key。
 中国語・日本語・英語での報告を歓迎します。再現手順を記載し、字幕全文やキーは添付しないでください。
+한국어 제보도 환영합니다. 재현 순서를 적고, 자막 전체나 키는 첨부하지 마세요.

@@ -1,6 +1,16 @@
 (function () {
   'use strict';
   const NS = self.CRSubFix;
+  const t = (source, params) => NS.i18n?.t(source, params) ?? source;
+  const resolve = value => typeof value === 'function' ? value() : value;
+  const text = (el, source, params) => {
+    if (NS.playerI18n) NS.playerI18n.text(el, source, params);
+    else el.textContent = t(source, params);
+  };
+  const attr = (el, name, source) => {
+    if (NS.playerI18n) NS.playerI18n.attr(el, name, source);
+    else el.setAttribute(name, t(source));
+  };
   const PANEL_ID = 'cr-bsub-translation-hud';
   const NOTICE_ID = 'cr-bsub-translation-notice';
   function makeTranslationStatus(host, { getAnchor, onPause }) {
@@ -50,9 +60,9 @@
     function button(text, title, handler) {
       const el = document.createElement('button');
       el.type = 'button';
-      el.textContent = text;
-      el.title = title;
-      el.setAttribute('aria-label', title);
+      el.textContent = t(text);
+      attr(el, 'title', title);
+      attr(el, 'aria-label', title);
       el.style.cssText = 'min-height:32px;min-width:32px;padding:4px 10px;border:1px solid #697873;border-radius:4px;background:#29322f;color:#f3f5f4;font:inherit;cursor:pointer;letter-spacing:0';
       el.addEventListener('click', handler);
       return el;
@@ -90,8 +100,8 @@
       if (anchor) {
         anchor.style.display = state === 'idle' ? 'none' : '';
         anchor.dataset.state = state;
-        anchor.title = `${titles[state]}${total ? `: ${step}/${total}` : ''}`;
-        anchor.setAttribute('aria-label', `Translation progress: ${anchor.title}`);
+        anchor.title = `${t(titles[state])}${total ? `: ${step}/${total}` : ''}`;
+        anchor.setAttribute('aria-label', t('Translation progress: {status}', { status: anchor.title }));
         anchor.setAttribute('aria-expanded', String(!!panel));
         anchor.setAttribute('aria-controls', PANEL_ID);
         const label = anchor.querySelector('[data-label]');
@@ -106,17 +116,17 @@
       }
       if (!panel) return;
       panel.dataset.state = state;
-      fields.title.textContent = titles[state];
+      fields.title.textContent = t(titles[state]);
       fields.count.textContent = total ? `${step} / ${total}` :
-        state === 'running' ? 'Loading subtitles' : state === 'complete' ? 'Complete' : '0';
+        state === 'running' ? t('Loading subtitles') : state === 'complete' ? t('Complete') : '0';
       fields.progress.value = pct();
-      fields.detail.textContent = state === 'error' ? failure : description;
+      fields.detail.textContent = t(resolve(state === 'error' ? failure : description));
       fields.detail.style.color = state === 'error' ? '#ffc16a' : '#b7c5bf';
       const label = state === 'error' ? retryLabel : state === 'paused' ? 'Resume translation' :
         state === 'pausing' ? 'Finishing current requests' : 'Pause translation';
-      fields.action.textContent = label;
-      fields.action.title = label;
-      fields.action.setAttribute('aria-label', label);
+      fields.action.textContent = t(resolve(label));
+      fields.action.title = t(resolve(label));
+      fields.action.setAttribute('aria-label', t(resolve(label)));
       fields.action.hidden = state === 'complete' || state === 'idle' || (state === 'error' && !retry);
       fields.action.disabled = state === 'pausing';
       place(panel);
@@ -127,7 +137,7 @@
       if (panel) return close(true);
       panel = surface(PANEL_ID);
       panel.setAttribute('role', 'dialog');
-      panel.setAttribute('aria-label', 'Translation details');
+      attr(panel, 'aria-label', 'Translation details');
       const header = document.createElement('div');
       header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px';
       const title = document.createElement('strong');
@@ -137,7 +147,7 @@
       count.style.margin = '8px 0 4px';
       const progress = document.createElement('progress');
       progress.max = 100;
-      progress.setAttribute('aria-label', 'Translated subtitles');
+      attr(progress, 'aria-label', 'Translated subtitles');
       progress.style.cssText = 'width:100%;height:6px;accent-color:#ff853d';
       const detail = document.createElement('p');
       detail.style.cssText = 'white-space:pre-wrap;margin:10px 0;line-height:1.5';
@@ -172,10 +182,10 @@
       retry = null;
       refresh();
     }
-    function error(text, onRetry, label = 'Retry') {
+    function error(text, onRetry, label = 'Retry', repaintText) {
       if (destroyed) return;
       state = 'error';
-      failure = text;
+      failure = repaintText || text;
       retry = onRetry;
       retryLabel = label;
       clearNotice();
@@ -183,16 +193,24 @@
       if (panel) return;
       notice = surface(NOTICE_ID);
       notice.setAttribute('role', 'status');
-      const code = text.match(/\[([A-Z0-9_]+)\]\s*$/)?.[1];
-      notice.textContent = `Translation stopped${code ? `: ${code}` : ''}`;
+      const code = String(resolve(text)).match(/\[([A-Z0-9_]+)\]\s*$/)?.[1];
+      notice.textContent = `${t('Translation stopped')}${code ? `: ${code}` : ''}`;
       place(notice);
       noticeTimer = setTimeout(clearNotice, 3000);
     }
+    const unwatch = NS.i18n?.watch(() => {
+      refresh();
+      if (notice) {
+        const code = String(resolve(failure)).match(/\[([A-Z0-9_]+)\]\s*$/)?.[1];
+        notice.textContent = `${t('Translation stopped')}${code ? `: ${code}` : ''}`;
+        place(notice);
+      }
+    });
     return {
       start, error, refresh, toggle: open, setResume: callback => { resume = callback; },
-      update: (done, count, desc) => {
+      update: (done, count, desc, repaintDesc) => {
         if (destroyed) return;
-        step = done; total = count; description = desc;
+        step = done; total = count; description = repaintDesc || desc;
         refresh();
       },
       fade: () => close(),
@@ -203,7 +221,7 @@
         refresh();
       },
       reposition: () => { if (panel) place(panel); if (notice) place(notice); },
-      destroy: () => { close(); clearNotice(); destroyed = true; },
+      destroy: () => { close(); clearNotice(); destroyed = true; unwatch?.(); },
     };
   }
   NS.ui.makeTranslationStatus = makeTranslationStatus;

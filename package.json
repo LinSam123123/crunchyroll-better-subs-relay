@@ -1,6 +1,6 @@
 {
   "name": "crunchyroll-better-subs-relay",
-  "version": "2.7.0-relay.30",
+  "version": "2.7.0-relay.32",
   "private": true,
   "license": "MIT",
   "engines": { "node": ">=22" },
@@ -15,6 +15,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tools/browser-test.mjs",
     "test:external-browser": "node tools/external-browser-test.mjs",
+    "test:i18n-browser": "node tools/i18n-browser-test.mjs",
+    "test:worker-upgrade": "node tools/worker-upgrade-test.mjs",
     "verify": "npm run build && npm test",
     "privacy": "node tools/privacy-scan.mjs"
   }

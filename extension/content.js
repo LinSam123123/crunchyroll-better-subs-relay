@@ -28,7 +28,7 @@
   }
 
   const SETTINGS = self.CRSubFix.settings;
-  const { ATTR, STATUS, MSG, POST } = self.CRSubFix.protocol;
+  const { ATTR, STATUS, MSG, POST, isBackgroundSender } = self.CRSubFix.protocol;
 
   // CR's framework strips our custom data-* attribute off <html> during
   // hydration, which would null the toggle token and make us reject every
@@ -478,7 +478,7 @@
   });
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type === MSG.EXTERNAL_OFFICIAL_NAMES) {
-      if (_sender.id !== chrome.runtime.id || _sender.url !== chrome.runtime.getURL('background.js') ||
+      if (!isBackgroundSender(chrome.runtime, _sender) ||
           msg.payload?.guid !== self.CRSubFix.workProfiles.route(location.href, 'watch')) {
         sendResponse({ ok: false, error: 'EXTERNAL_CONTEXT_EXPIRED' }); return;
       }
@@ -491,7 +491,7 @@
       return true;
     }
     if ([MSG.EXTERNAL_TIME, MSG.EXTERNAL_APPLY].includes(msg?.type)) {
-      if (_sender.id !== chrome.runtime.id || _sender.url !== chrome.runtime.getURL('background.js') ||
+      if (!isBackgroundSender(chrome.runtime, _sender) ||
           msg.payload?.guid !== self.CRSubFix.workProfiles.route(location.href, 'watch')) {
         sendResponse({ ok: false, error: 'EXTERNAL_CONTEXT_EXPIRED' }); return;
       }
@@ -514,7 +514,7 @@
       return;
     }
     if (msg.type === MSG.WORK_PAGE_CHECK) {
-      if (_sender.id !== chrome.runtime.id || _sender.url !== chrome.runtime.getURL('background.js')) return;
+      if (!isBackgroundSender(chrome.runtime, _sender)) return;
       sendResponse({ guid: self.CRSubFix.workProfiles.route(location.href, 'watch'), url: location.href,
         metadata: self.CRSubFix.episodeMetadata.detect(document, location.href) });
       return;

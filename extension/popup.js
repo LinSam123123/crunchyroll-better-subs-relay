@@ -1,3 +1,12 @@
+const i18n = self.CRSubFix.i18n;
+const t = (source, params) => i18n?.t(source, params) ?? source;
+const uiText = (el, source, params) => {
+  if (self.CRSubFix.playerI18n) self.CRSubFix.playerI18n.text(el, source, params);
+  else if (el) el.textContent = t(source, params);
+};
+const uiLanguage = document.querySelector('[data-ui-language]');
+// The shared runtime saves [data-ui-language] controls in extension pages.
+
 // ── Element refs ──────────────────────────────────────────────────────────
 const toggleEnabled       = document.getElementById('toggleEnabled');
 const toggleAuto          = document.getElementById('toggleAuto');
@@ -179,13 +188,15 @@ const LOCALE_LABELS = {
   'zh-CN': 'Chinese (Simpl.)','zh-TW':'Chinese (Trad.)',
   'hi-IN': 'Hindi',     'ko-KR': 'Korean',
 };
-const localeName = (l) => l ? (LOCALE_LABELS[l] ?? l) : null;
+const localeName = (l) => l ? t(LOCALE_LABELS[l] ?? l) : null;
 
+let lastStatus = null;
 function setStatus(key, info) {
+  lastStatus = { key, info };
   const cfg = STATUS_DISPLAY[key] ?? STATUS_DISPLAY[S.NONE];
   statusDot.style.background = cfg.color;
   statusDot.classList.toggle('pulse', cfg.pulse);
-  statusText.textContent = cfg.text;
+  uiText(statusText, cfg.text);
 
   // Live detail grid: what's showing, the audio language, and remaster sync.
   // Shown only when there's something active to report; keeps the card clean
@@ -194,8 +205,8 @@ function setStatus(key, info) {
   const hint    = document.getElementById('stHint');
   const showing = info?.source ? localeName(info.source) : null;
   const audio   = info?.audio  ? localeName(info.audio)  : null;
-  const sync    = info?.remaster === 'synced'  ? 'Synced'
-                : info?.remaster === 'pending' ? 'Adjusting…' : null;
+  const sync    = info?.remaster === 'synced'  ? t('Synced')
+                : info?.remaster === 'pending' ? t('Adjusting…') : null;
   if (grid && (showing || audio)) {
     document.getElementById('stShowing').textContent = showing ?? '—';
     document.getElementById('stAudio').textContent   = audio ?? '—';
@@ -209,7 +220,7 @@ function setStatus(key, info) {
     let t = '';
     if (key === 'notwatch')     t = 'Open a Crunchyroll episode to start.';
     else if (key === S.READY)   t = 'Open the ▾ menu on the player to pick a language.';
-    if (hint) { hint.textContent = t; hint.style.display = t ? '' : 'none'; }
+    if (hint) { uiText(hint, t); hint.style.display = t ? '' : 'none'; }
   }
 }
 
@@ -240,11 +251,13 @@ function setStatus(key, info) {
         setStatus('noscript');
         const hint = document.getElementById('stHint');
         if (hint) {
-          hint.textContent = 'This tab was open before the extension loaded — reload it to activate. ';
+          const note = document.createElement('span');
+          uiText(note, 'This tab was open before the extension loaded — reload it to activate.');
+          hint.replaceChildren(note, document.createTextNode(' '));
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'st-reload';
-          b.textContent = 'Reload tab';
+          uiText(b, 'Reload tab');
           b.addEventListener('click', () => { chrome.tabs.reload(tab.id); window.close(); });
           hint.appendChild(b);
           hint.style.display = '';
@@ -280,7 +293,7 @@ function updatePreview() {
   if (!override) {
     // Default look — white text, black silhouette outline.  Same SVG
     // builder as the page-side renderer for byte-equal styling.
-    renderPreviewContent(createOutlinedTextSvg(PREVIEW_TEXT, {
+    renderPreviewContent(createOutlinedTextSvg(t(PREVIEW_TEXT), {
       fillColor:    'rgb(255,255,255)',
       outlineColor: 'rgb(0,0,0)',
       bord:         2,
@@ -323,12 +336,12 @@ function updatePreview() {
       `font-weight:500;line-height:${lineHeight};` +
       `background:${bgCol};border-radius:${radius}px;padding:${paddingY}px ${px}px;` +
       glassCss;
-    span.textContent = PREVIEW_TEXT;
+    span.textContent = t(PREVIEW_TEXT);
     renderPreviewContent(span);
     return;
   }
 
-  renderPreviewContent(createOutlinedTextSvg(PREVIEW_TEXT, {
+  renderPreviewContent(createOutlinedTextSvg(t(PREVIEW_TEXT), {
     fillColor:    textColor,
     outlineColor: colorOutline.value,
     bord:         parseFloat(bordSlider.value),
@@ -402,6 +415,7 @@ function styleProfile(s) {
 }
 
 function populateFromSettings(s) {
+  if (uiLanguage) uiLanguage.value = s.uiLanguage || 'auto';
   toggleEnabled.checked = s.enabled;
   toggleAuto.checked    = s.autoActivate;
   toggleShowDialogue.checked = s.showDialogue;
@@ -423,8 +437,8 @@ function populateFromSettings(s) {
     b.classList.toggle('active', b.dataset.val === styleTarget);
   });
   const styleLabel = (styleTarget === 'signs') ? 'signs' : 'dialogue';
-  if (toggleStyleOverrideLabel) toggleStyleOverrideLabel.textContent =
-    styleTarget === 'signs' ? 'Custom style for signs' : 'Override subtitle style';
+  uiText(toggleStyleOverrideLabel,
+    styleTarget === 'signs' ? 'Custom style for signs' : 'Override subtitle style');
 
   toggleStyleOverride.checked = sp.styleOverride;
   styleControls.classList.toggle('disabled', !sp.styleOverride);
@@ -508,15 +522,25 @@ async function refreshMtStatus() {
   try {
     const state = await chrome.runtime.sendMessage({ type: MSG.MT_GET_CONFIG });
     if (!state?.ok) throw new Error();
-    mtStatus.textContent = state.hasKey && state.authorized
-      ? `${state.config.provider === 'relay' ? state.config.model : 'DeepL'} · ${state.target}`
-      : '未配置 / Not configured';
+    if (state.hasKey && state.authorized) {
+      uiText(mtStatus, '{provider} · {language}', {
+        provider: state.config.provider === 'relay' ? state.config.model : 'DeepL', language: state.target,
+      });
+    } else uiText(mtStatus, '未配置 / Not configured');
     toggleMtEnabled.checked = state.enabled;
-  } catch (_) { mtStatus.textContent = '设置读取失败 / Settings unavailable'; }
+  } catch (_) { uiText(mtStatus, '设置读取失败 / Settings unavailable'); }
 }
 refreshMtStatus();
+i18n?.watch(() => {
+  if (lastStatus && lastStatus.key !== 'noscript') setStatus(lastStatus.key, lastStatus.info);
+  refreshMtStatus();
+  updatePreview();
+});
 chrome.storage.onChanged.addListener((_changes, area) => {
-  if (area === 'local') refreshMtStatus();
+  if (area === 'local') {
+    refreshMtStatus();
+    if (_changes.uiLanguage && uiLanguage) uiLanguage.value = _changes.uiLanguage.newValue || 'auto';
+  }
 });
 
 toggleMtEnabled?.addEventListener('change', () => {
@@ -771,7 +795,7 @@ bgGlassHue.addEventListener('input', () => {
     const text = target.dataset.tip;
     if (!text) return;
     const tip = ensureTip();
-    tip.textContent = text;
+    tip.textContent = t(text);
     tip.style.display = 'block';
     // Force a layout pass so getBoundingClientRect reflects the new size.
     tip.style.left = '0px';
@@ -903,12 +927,12 @@ async function buildDiagnostics(full) {
 // Primary — send straight to the report endpoint (Discord).
 reportSend?.addEventListener('click', async () => {
   if (!REPORT_ENDPOINT) {
-    reportSend.textContent = 'Reporting not configured';
-    setTimeout(() => { reportSend.textContent = 'Send a report'; }, 2500);
+    uiText(reportSend, 'Reporting not configured');
+    setTimeout(() => { uiText(reportSend, 'Send a report'); }, 2500);
     return;
   }
   reportSend.disabled = true;
-  reportSend.textContent = 'Sending…';
+  uiText(reportSend, 'Sending…');
   const note   = (reportNote?.value || '').trim();
   const bundle = (note ? `note    : ${note}\n` : '') + await buildDiagnostics(toggleIncludeDiag.checked);
   let ok = false;
@@ -921,10 +945,10 @@ reportSend?.addEventListener('click', async () => {
     ok = resp.ok;
   } catch (_) { ok = false; }
   reportSend.disabled = false;
-  reportSend.textContent = ok ? '✓ Sent — thanks!' : '✗ Could not send';
+  uiText(reportSend, ok ? '✓ Sent — thanks!' : '✗ Could not send');
   reportSend.classList.toggle('ok', ok);
   if (ok && reportNote) reportNote.value = '';
-  setTimeout(() => { reportSend.textContent = 'Send a report'; reportSend.classList.remove('ok'); }, 3000);
+  setTimeout(() => { uiText(reportSend, 'Send a report'); reportSend.classList.remove('ok'); }, 3000);
 });
 
 // ── Quick survey ─────────────────────────────────────────────────────────────
@@ -944,19 +968,19 @@ surveyRate?.addEventListener('click', (e) => {
 
 surveySend?.addEventListener('click', async () => {
   if (!REPORT_ENDPOINT) {
-    surveySend.textContent = 'Not configured';
-    setTimeout(() => { surveySend.textContent = 'Send survey'; }, 2500);
+    uiText(surveySend, 'Not configured');
+    setTimeout(() => { uiText(surveySend, 'Send survey'); }, 2500);
     return;
   }
   const feats = [...document.querySelectorAll('.surveyFeat:checked')].map(c => c.value);
   const note  = (document.getElementById('surveyNote')?.value || '').trim();
   if (!feats.length && !note && !surveyRating) {
-    surveySend.textContent = 'Pick or write something first';
-    setTimeout(() => { surveySend.textContent = 'Send survey'; }, 2500);
+    uiText(surveySend, 'Pick or write something first');
+    setTimeout(() => { uiText(surveySend, 'Send survey'); }, 2500);
     return;
   }
   surveySend.disabled = true;
-  surveySend.textContent = 'Sending…';
+  uiText(surveySend, 'Sending…');
   const lines = [
     'SURVEY — Better Subs for Crunchyroll',
     `version : ${chrome.runtime.getManifest().version}`,
@@ -983,9 +1007,9 @@ surveySend?.addEventListener('click', async () => {
     ok = resp.ok;
   } catch (_) { ok = false; }
   surveySend.disabled = false;
-  surveySend.textContent = ok ? '✓ Thank you!' : '✗ Could not send';
+  uiText(surveySend, ok ? '✓ Thank you!' : '✗ Could not send');
   surveySend.classList.toggle('ok', ok);
-  setTimeout(() => { surveySend.textContent = 'Send survey'; surveySend.classList.remove('ok'); }, 3000);
+  setTimeout(() => { uiText(surveySend, 'Send survey'); surveySend.classList.remove('ok'); }, 3000);
 });
 
 // Secondary — open a pre-filled public GitHub issue (the user submits it).

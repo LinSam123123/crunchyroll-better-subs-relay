@@ -1,7 +1,11 @@
 'use strict';
 const { MSG } = self.CRSubFix.protocol;
 const R = self.CRSubFix.relay;
+const I = self.CRSubFix.i18n;
+const t = (text, params) => I.t(text, params);
 const el = id => document.getElementById(id);
+const manifest = chrome.runtime?.getManifest?.();
+el('version').textContent = manifest?.version_name || manifest?.version || '';
 const errors = {
   INVALID_MODE: '翻译模式无效。',
   INVALID_GLOSSARY: '术语表应是 JSON 对象，键和值为非空文本；最多 200 项，每项不超过 200 字符。',
@@ -42,22 +46,29 @@ const errors = {
 const labels = { 'zh-CN': '简体中文', 'zh-TW': '繁体中文', 'en-US': '英语（美国）', 'en-GB': '英语（英国）',
   'ja-JP': '日语', 'ko-KR': '韩语', 'de-DE': '德语', 'es-419': '西班牙语（拉美）', 'es-ES': '西班牙语',
   'fr-FR': '法语', 'pt-BR': '葡萄牙语（巴西）', 'pt-PT': '葡萄牙语（葡萄牙）', 'it-IT': '意大利语', 'ru-RU': '俄语' };
-el('source').add(new Option('自动选择', ''));
+el('source').add(new Option(t('自动选择'), ''));
 for (const [code, label] of Object.entries(labels)) {
-  el('source').add(new Option(code === 'ja-JP' ? '英语（日语音轨）' : label, code));
-  el('target').add(new Option(label, code));
+  el('source').add(new Option(t(code === 'ja-JP' ? '英语（日语音轨）' : label), code));
+  el('target').add(new Option(t(label), code));
 }
 let busy = false;
 let savedState = null;
-function status(text, error = false) {
-  el('status').textContent = text;
+let currentStatus = { text: '正在读取设置…', error: false, params: undefined };
+function status(text, error = false, params) {
+  currentStatus = { text, error, params };
+  el('status').textContent = t(text, params);
   el('status').dataset.error = String(error);
 }
 function failure(e) {
-  const message = e.message === 'INCOMPLETE_RESPONSE' && el('translationMode').value === 'episode-stream'
-    ? '流式输出未完整结束，请核对接口和模型的输出限制。不会自动重发请求。'
-    : errors[e.message] || `操作失败：${/^[A-Z0-9_]+$/.test(e.message) ? e.message : '请重试'}`;
-  status(message, true);
+  if (e.message === 'INCOMPLETE_RESPONSE' && el('translationMode').value === 'episode-stream') {
+    status('流式输出未完整结束，请核对接口和模型的输出限制。不会自动重发请求。', true);
+  } else if (errors[e.message]) {
+    status(errors[e.message], true);
+  } else if (/^[A-Z0-9_]+$/.test(e.message)) {
+    status('操作失败：{message}', true, { message: e.message });
+  } else {
+    status('操作失败：请重试', true);
+  }
 }
 async function send(type, payload) {
   const res = await chrome.runtime.sendMessage({ type, payload });
@@ -73,8 +84,24 @@ function providerVisibility() {
   el('workEnabled').disabled = !relay;
   const stream = relay && el('translationMode').value === 'episode-stream';
   for (const id of ['batchSize', 'maxChars', 'concurrency']) el(id).disabled = stream;
-  el('timeoutLabel').textContent = stream ? '首段／空闲超时（秒）' : '超时（秒）';
+  el('timeoutLabel').textContent = t(stream ? '首段／空闲超时（秒）' : '超时（秒）');
 }
+function refreshUiLanguage() {
+  el('source').options[0].textContent = t('自动选择');
+  for (const [index, [code, label]] of Object.entries(labels).entries()) {
+    el('source').options[index + 1].textContent = t(code === 'ja-JP' ? '英语（日语音轨）' : label);
+    el('target').options[index].textContent = t(label);
+  }
+  el('timeoutLabel').textContent = t(el('provider').value === 'relay' && el('translationMode').value === 'episode-stream'
+    ? '首段／空闲超时（秒）' : '超时（秒）');
+  el('apiKey').placeholder = t(savedState?.hasKey ? '留空保留当前密钥' : '输入密钥');
+  if (savedState) {
+    el('keyState').textContent = t(savedState.hasKey ? '已保存' : '未设置');
+  }
+  status(currentStatus.text, currentStatus.error, currentStatus.params);
+}
+I.watch(refreshUiLanguage);
+I.ready.then(refreshUiLanguage);
 function fill(state) {
   savedState = state;
   const c = state.config;
@@ -88,8 +115,8 @@ function fill(state) {
   el('enabled').checked = state.enabled;
   el('workEnabled').checked = state.workEnabled === true;
   el('apiKey').value = '';
-  el('apiKey').placeholder = state.hasKey ? '留空保留当前密钥' : '输入密钥';
-  el('keyState').textContent = state.hasKey ? '已保存' : '未设置';
+  el('apiKey').placeholder = t(state.hasKey ? '留空保留当前密钥' : '输入密钥');
+  el('keyState').textContent = t(state.hasKey ? '已保存' : '未设置');
   el('test').disabled = !state.hasKey || !state.authorized;
   el('clear').disabled = !state.hasKey;
   providerVisibility();

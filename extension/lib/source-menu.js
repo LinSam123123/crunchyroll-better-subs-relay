@@ -37,6 +37,7 @@
  */
 (function () {
   'use strict';
+  const t = (source, params) => self.CRSubFix?.i18n?.t(source, params) ?? source;
 
   const NS = (typeof self !== 'undefined' ? self : globalThis);
   if (!NS.CRSubFix || !NS.CRSubFix.uiTheme) return;
@@ -108,7 +109,7 @@
     // lib/subtitle-catalog.js) — mirroring CR's own "English (CC)" naming so
     // dub watchers find the track they expect.
     function localeRowLabel(ep, locale) {
-      const base  = localeLabels[locale] ?? locale;
+      const base  = t(localeLabels[locale] ?? locale);
       const audio = ep?.catalog.currentAudio();
       return (audio && audio !== 'ja-JP' && locale === audio &&
               ep.catalog.captionSourced?.(audio, locale)) ? `${base} (CC)` : base;
@@ -130,7 +131,8 @@
         fontWeight:   isActive ? '700' : '400',
         background:   'transparent',
         userSelect:   'none',
-        whiteSpace:   'nowrap',
+        whiteSpace:   'normal',
+        overflowWrap: 'anywhere',
         display:      'flex',
         alignItems:   'center',
         gap:          '8px',
@@ -145,19 +147,19 @@
       row.appendChild(text);
       if (unavail) {
         const tag = document.createElement('span');
-        tag.textContent = 'no subs';
+        tag.textContent = t('no subs');
         tag.style.cssText = 'font-size:10px;color:#444;margin-left:auto;padding-left:8px;flex-shrink:0;';
         row.appendChild(tag);
       } else if (validation === 'no-subs') {
         const tag = document.createElement('span');
         tag.dataset.vtag = '1';
-        tag.textContent = 'no subs';
+        tag.textContent = t('no subs');
         tag.style.cssText = 'font-size:10px;color:#555;margin-left:auto;padding-left:8px;flex-shrink:0;';
         row.appendChild(tag);
       } else if (isWrong) {
         const tag = document.createElement('span');
         tag.dataset.vtag = '1';
-        tag.textContent = '⚠ wrong title';
+        tag.textContent = t('⚠ wrong title');
         tag.style.cssText = 'font-size:10px;color:#cc9900;margin-left:auto;padding-left:8px;flex-shrink:0;';
         row.appendChild(tag);
       }
@@ -196,13 +198,13 @@
       text.textContent = label;
       text.style.cssText = 'overflow:hidden;text-overflow:ellipsis;max-width:150px;';
       const tag = document.createElement('span');
-      tag.textContent = badge;
+      tag.textContent = t(badge);
       tag.style.cssText = `font-size:10px;color:${badge === 'machine' ? '#b08cff' : '#7fcfff'};margin-left:auto;padding-left:8px;flex-shrink:0;`;
       // Always-visible remove button (a small ✕ chip), so it doesn't depend on
       // hover discovery.  Turns red on its own hover.
       const del = document.createElement('span');
       del.textContent = '✕';
-      del.title = 'Remove this source';
+      del.title = t('Remove this source');
       del.style.cssText = 'font-size:11px;color:#bbb;margin-left:6px;padding:1px 6px;flex-shrink:0;' +
         'border:1px solid rgba(255,255,255,0.25);border-radius:3px;background:rgba(255,255,255,0.06);cursor:pointer;transition:background 0.12s,color 0.12s,border-color 0.12s;';
       del.addEventListener('mouseenter', e => { e.stopPropagation(); del.style.background = 'rgba(229,85,85,0.3)'; del.style.color = '#fff'; del.style.borderColor = '#e55'; });
@@ -227,7 +229,7 @@
         background: 'transparent', userSelect: 'none', whiteSpace: 'nowrap',
         borderRadius: '3px',
       });
-      row.textContent = label;
+      row.textContent = t(label);
       row.addEventListener('mouseenter', () => { row.style.background = THEME.rowHover; row.style.color = THEME.text; });
       row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; row.style.color = THEME.textDim; });
       row.addEventListener('click', e => { e.stopPropagation(); onClick(); });
@@ -259,10 +261,10 @@
       }
 
       if (isWrong) {
-        ensureTag().textContent = '⚠ wrong title';
+        ensureTag().textContent = t('⚠ wrong title');
         tag.style.color = '#cc9900';
       } else if (validation === 'no-subs' && !unavail) {
-        ensureTag().textContent = 'no subs';
+        ensureTag().textContent = t('no subs');
         tag.style.color = '#555';
       } else if (tag) {
         tag.remove();   // valid / active: no badge (de-noised — Concept 4)
@@ -271,7 +273,7 @@
 
     function makeSectionHeader(text) {
       const h = document.createElement('div');
-      h.textContent = text;
+      h.textContent = t(text);
       Object.assign(h.style, {
         padding:       '7px 14px 5px',
         fontSize:      '11px',
@@ -307,16 +309,16 @@
       const cur = document.createElement('span');
       if (activeLabel) {
         cur.textContent = `${activeLabel} ✓`;
-        cur.style.cssText = `font-size:13px;font-weight:700;color:${THEME.accent};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+        cur.style.cssText = `font-size:13px;font-weight:700;color:${THEME.accent};white-space:normal;overflow-wrap:anywhere;overflow:hidden;text-overflow:ellipsis;`;
       } else {
-        cur.textContent = 'Subtitles off';
-        cur.style.cssText = `font-size:13px;font-weight:600;color:${THEME.textMuted};white-space:nowrap;`;
+        cur.textContent = t('Subtitles off');
+        cur.style.cssText = `font-size:13px;font-weight:600;color:${THEME.textMuted};white-space:normal;overflow-wrap:anywhere;`;
       }
       h.appendChild(cur);
       if (audioLabel) {
         const aud = document.createElement('span');
-        aud.textContent = `audio · ${audioLabel}`;
-        aud.style.cssText = `font-size:10px;color:${THEME.textMuted};margin-left:auto;white-space:nowrap;flex-shrink:0;`;
+        aud.textContent = t('audio · {language}', { language: t(audioLabel) });
+        aud.style.cssText = `font-size:10px;color:${THEME.textMuted};margin-left:auto;white-space:normal;overflow-wrap:anywhere;flex-shrink:0;`;
         h.appendChild(aud);
       }
       return h;
@@ -337,13 +339,13 @@
       ic.style.cssText = 'font-size:15px;line-height:1;flex-shrink:0;';
       const col = document.createElement('span');
       col.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;';
-      const t = document.createElement('span');
-      t.textContent = title;
-      t.style.cssText = `font-size:12.5px;font-weight:${accentTitle ? '700' : '500'};color:${accentTitle ? THEME.accent : THEME.text};white-space:nowrap;`;
+      const titleEl = document.createElement('span');
+      titleEl.textContent = self.CRSubFix.i18n?.t(title) ?? title;
+      titleEl.style.cssText = `font-size:12.5px;font-weight:${accentTitle ? '700' : '500'};color:${accentTitle ? THEME.accent : THEME.text};white-space:normal;overflow-wrap:anywhere;`;
       const s = document.createElement('span');
-      s.textContent = sub;
-      s.style.cssText = `font-size:10px;font-weight:400;color:${THEME.textMuted};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
-      col.appendChild(t); col.appendChild(s);
+      s.textContent = t(sub);
+      s.style.cssText = `font-size:10px;font-weight:400;color:${THEME.textMuted};white-space:normal;overflow-wrap:anywhere;overflow:hidden;text-overflow:ellipsis;`;
+      col.appendChild(titleEl); col.appendChild(s);
       const ar = document.createElement('span');
       ar.textContent = '›';
       ar.style.cssText = `color:${THEME.textDim};font-size:11px;flex-shrink:0;`;
@@ -367,7 +369,7 @@
           cursor: 'pointer', fontFamily: THEME.font, fontSize: '11px', color: THEME.text, whiteSpace: 'nowrap',
         });
         const ic = document.createElement('span'); ic.textContent = it.icon;
-        const lb = document.createElement('span'); lb.textContent = it.label;
+        const lb = document.createElement('span'); lb.textContent = t(it.label);
         b.appendChild(ic); b.appendChild(lb);
         b.addEventListener('mouseenter', () => { b.style.borderColor = THEME.accent; });
         b.addEventListener('mouseleave', () => { b.style.borderColor = THEME.panelEdge; });
@@ -391,13 +393,13 @@
       const txt = document.createElement('div');
       txt.style.cssText = 'flex:1;min-width:0;';
       const main = document.createElement('div');
-      main.textContent = label;
-      main.style.cssText = `font-size:13px;color:${THEME.text};white-space:nowrap;`;
+      main.textContent = t(label);
+      main.style.cssText = `font-size:13px;color:${THEME.text};white-space:normal;overflow-wrap:anywhere;`;
       txt.appendChild(main);
       if (sub) {
         const s = document.createElement('div');
-        s.textContent = sub;
-        s.style.cssText = `font-size:10px;color:${THEME.textMuted};margin-top:1px;white-space:nowrap;`;
+        s.textContent = t(sub);
+        s.style.cssText = `font-size:10px;color:${THEME.textMuted};margin-top:1px;white-space:normal;overflow-wrap:anywhere;`;
         txt.appendChild(s);
       }
       const sw = document.createElement('span');
@@ -430,7 +432,7 @@
         justifyContent: 'space-between', gap: '8px', fontFamily: THEME.font,
       });
       const label = document.createElement('span');
-      label.textContent = 'Signs';
+      label.textContent = t('Signs');
       label.style.cssText = `font-size:11px;color:${THEME.text};`;
       const seg = document.createElement('div');
       seg.style.cssText = 'display:flex;gap:3px;';
@@ -438,7 +440,7 @@
       for (const [val, txt] of [['primary', 'Primary'], ['secondary', 'Secondary'], ['both', 'Both']]) {
         const disabled = !hasSigns && val !== 'primary';
         const b = document.createElement('button');
-        b.textContent = txt;
+        b.textContent = t(txt);
         const active = cur === val;
         b.style.cssText =
           'padding:3px 7px;font-size:10px;font-weight:600;font-family:inherit;border-radius:4px;flex-shrink:0;' +
@@ -446,7 +448,7 @@
           (active
             ? `background:${THEME.accentTint};color:${THEME.accent};border:1px solid ${THEME.accent};`
             : `background:rgba(255,255,255,0.06);color:${THEME.textDim};border:1px solid ${THEME.panelEdge};`);
-        if (disabled) b.title = 'This track has no typeset signs';
+        if (disabled) b.title = t('This track has no typeset signs');
         else b.addEventListener('click', (e) => { e.stopPropagation(); onSetSignSource?.(val); rebuild(); });
         seg.appendChild(b);
       }
@@ -455,7 +457,7 @@
       wrap.appendChild(row);
       if (!hasSigns) {
         const note = document.createElement('div');
-        note.textContent = 'This subtitle track has no typeset signs.';
+        note.textContent = t('This subtitle track has no typeset signs.');
         note.style.cssText = `padding:0 14px 6px;font-size:10px;line-height:1.4;color:${THEME.textMuted};`;
         wrap.appendChild(note);
       }
@@ -515,10 +517,10 @@
         const audio       = info.audioLocale || '';
         // Prefer the caller-resolved audio label (it knows ja-JP audio is
         // "Japanese", not the ja-JP subtitle-row label); fall back to our map.
-        const audioLabel  = info.audioLabel || (audio ? (localeLabels[audio] ?? audio) : '');
+        const audioLabel  = t(info.audioLabel || (audio ? (localeLabels[audio] ?? audio) : ''));
         const audioHasSub = !!info.audioHasSub;
         const native      = info.native || '';
-        const nativeLabel = localeLabels[native] ?? native;
+        const nativeLabel = t(localeLabels[native] ?? native);
         const nativeAvail = info.nativeAvailable !== false;   // undefined (old caller) → assume available
         const cur         = getSecondary?.() || '';
         const primary     = ep.activeSource() ?? 'ja-JP';
@@ -528,7 +530,7 @@
         menuEl.appendChild(makeDivider());
 
         const intro = document.createElement('div');
-        intro.textContent = 'Show two subtitles at once — one matching the audio, one in your language — to read along while you learn.';
+        intro.textContent = t('Show two subtitles at once — one matching the audio, one in your language — to read along while you learn.');
         intro.style.cssText = `padding:2px 14px 8px;font-size:11px;line-height:1.5;color:${THEME.textDim};white-space:normal;max-width:250px;`;
         menuEl.appendChild(intro);
 
@@ -539,13 +541,13 @@
             // Only promise "with <your language> below" when it's actually on
             // this episode; otherwise the tap gives the audio-language sub alone.
             const sub = nativeAvail
-              ? `with ${nativeLabel} below`
-              : `${nativeLabel} isn’t on this episode — ${audioLabel} only`;
-            menuEl.appendChild(makeSubtextRow('📚', `Match my audio — ${audioLabel}`,
+              ? t('with {language} below', { language: nativeLabel })
+              : t('{native} isn’t on this episode — {audio} only', { native: nativeLabel, audio: audioLabel });
+            menuEl.appendChild(makeSubtextRow('📚', t('Match my audio — {language}', { language: audioLabel }),
               sub, () => { close(); onApplyLearning(native); }, true));
           } else if (!audioHasSub) {
             const note = document.createElement('div');
-            note.textContent = `No ${audioLabel} subtitles on this episode to match the audio — pick a second language below.`;
+            note.textContent = t('No {language} subtitles on this episode to match the audio — pick a second language below.', { language: audioLabel });
             note.style.cssText = `padding:0 14px 8px;font-size:10px;line-height:1.4;color:${THEME.textMuted};`;
             menuEl.appendChild(note);
           }
@@ -571,14 +573,14 @@
           let hasMt = false;
           for (const cs of secCustoms) {
             if (cs.kind === 'mt') hasMt = true;
-            const tag = cs.kind === 'mt' ? ' · machine' : ' · file';
+            const tag = ' · ' + t(cs.kind === 'mt' ? 'machine' : 'file');
             menuEl.appendChild(makeRow((cs.label || cs.id) + tag, cur === cs.id, true, () => {
               close(); onSelectSecondary?.(cs.id);
             }, null, null));
           }
           if (hasMt) {
             const note = document.createElement('div');
-            note.textContent = '⚠ A second machine translation uses extra DeepL quota.';
+            note.textContent = t('⚠ A second machine translation uses extra DeepL quota.');
             note.style.cssText = `padding:4px 14px 6px;font-size:10px;line-height:1.4;color:${THEME.warn};`;
             menuEl.appendChild(note);
           }
@@ -696,7 +698,7 @@
         const secCustom = customs.find((c) => c.id === cur);
         const secLabel  = cur ? (secCustom?.label || localeRowLabel(ep, cur)) : '';
         menuEl.appendChild(makeSubtextRow('📚', 'Learning mode',
-          secLabel ? `Second subtitle: ${secLabel}` : 'Show two subtitles for study',
+          secLabel ? t('Second subtitle: {language}', { language: secLabel }) : 'Show two subtitles for study',
           () => { view = 'learn'; buildContent(menuEl); }, true));
       }
 
@@ -716,7 +718,7 @@
         padding: '9px 14px', cursor: 'pointer', fontFamily: THEME.font, fontSize: '12px',
         color: THEME.text, borderTop: `1px solid ${THEME.panelEdge}`, textAlign: 'center', flexShrink: '0',
       });
-      off.textContent = 'Turn subtitles off';
+      off.textContent = t('Turn subtitles off');
       off.addEventListener('mouseenter', () => { off.style.background = THEME.rowHover; });
       off.addEventListener('mouseleave', () => { off.style.background = 'transparent'; });
       off.addEventListener('click', (e) => { e.stopPropagation(); close(); onTurnOff?.(); });
@@ -765,7 +767,8 @@
       Object.assign(menu.style, panelStyle({
         position:  'fixed',
         zIndex:    '2147483646',
-        minWidth:  '170px',
+        minWidth:  'min(170px, calc(100vw - 16px))',
+        maxWidth:  'calc(100vw - 16px)',
         padding:   '4px 0',
         // Long source lists (10 locales + customs + actions + the secondary
         // entry) can exceed the viewport — cap the height and scroll instead of
@@ -825,7 +828,8 @@
 
       const menuBtn = document.createElement('button');
       menuBtn.id    = MENU_BTN_ID;
-      menuBtn.title = 'Select subtitle source';
+      menuBtn.title = t('Select subtitle source');
+      menuBtn.setAttribute('aria-label', menuBtn.title);
       menuBtn.textContent = '▾';
 
       Object.assign(menuBtn.style, {
@@ -867,6 +871,12 @@
       document.getElementById(MENU_BTN_ID)?.remove();
     }
 
+    self.CRSubFix.i18n?.watch(() => {
+      const button = document.getElementById(MENU_BTN_ID);
+      if (button) { button.title = t('Select subtitle source'); button.setAttribute('aria-label', button.title); }
+      const menu = document.getElementById(MENU_ID);
+      if (menu) buildContent(menu);
+    });
     return { injectButton, removeButton, updateButtonVisibility, close, updateRow };
   }
 

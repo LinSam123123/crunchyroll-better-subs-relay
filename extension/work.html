@@ -12,6 +12,13 @@
     <img src="icons/icon48.png" alt="" width="36" height="36">
     <div><h1>Better Subs</h1><p>作品资料</p></div>
     <a class="settings-link" href="translation.html">翻译设置</a>
+    <div class="ui-language"><select data-ui-language aria-label="界面语言" title="界面语言">
+      <option value="auto">自动</option>
+      <option value="zh-Hans" data-i18n-ignore>简体中文</option>
+      <option value="zh-Hant" data-i18n-ignore>繁體中文</option>
+      <option value="en" data-i18n-ignore>English</option>
+      <option value="ja" data-i18n-ignore>日本語</option>
+    </select></div>
   </header>
   <main>
     <p id="status" role="status" aria-live="polite">正在读取资料…</p>
@@ -19,7 +26,7 @@
       <fieldset id="fields" disabled>
         <section>
           <div class="section-heading"><h2>当前作品</h2><span id="state">未确认</span></div>
-          <dl><dt>页面识别</dt><dd id="detected"></dd><dt>字幕样本</dt><dd id="sample-count"></dd><dt>目标语言</dt><dd id="target"></dd></dl>
+          <dl><dt>页面识别</dt><dd id="detected" translate="no" data-i18n-ignore></dd><dt>字幕样本</dt><dd id="sample-count"></dd><dt>目标语言</dt><dd id="target" translate="no" data-i18n-ignore></dd></dl>
           <label for="profiles">已保存资料</label>
           <select id="profiles"><option value="">新建资料</option></select>
           <label class="check work-toggle"><input id="enabled" type="checkbox">作品资料辅助翻译（全局）</label>
@@ -27,23 +34,23 @@
           <input id="series-url" type="url" maxlength="500" placeholder="https://www.crunchyroll.com/series/…" spellcheck="false">
           <p id="scope" class="meta"></p>
           <label for="title">作品名</label>
-          <input id="title" maxlength="200" required>
+          <input id="title" data-i18n-ignore maxlength="200" required>
           <label for="aliases">别名</label>
-          <input id="aliases" maxlength="500">
-          <div class="actions draft-actions"><button id="generate" type="button">生成候选资料（调用 API）</button><span id="model" class="meta"></span></div>
+          <input id="aliases" data-i18n-ignore maxlength="500">
+          <div class="actions draft-actions"><button id="generate" type="button">生成候选资料（调用 API）</button><span id="model" translate="no" data-i18n-ignore class="meta"></span></div>
           <p id="draft-warning" class="warning" hidden>模型候选资料，未经联网核实；尚未保存或用于翻译。</p>
         </section>
         <section id="lookup-section">
           <h2>联网术语候选 · Bangumi</h2>
           <label for="lookup-query">作品名 / 别名</label>
           <div class="lookup-search">
-            <input id="lookup-query" maxlength="200" autocomplete="off">
+            <input id="lookup-query" data-i18n-ignore maxlength="200" autocomplete="off">
             <button id="lookup-search" type="button">查询作品</button>
           </div>
           <p id="lookup-status" class="meta" role="status" aria-live="polite">尚未查询</p>
           <div id="lookup-subjects"></div>
           <div id="lookup-terms" hidden>
-            <div class="section-heading"><h3 id="lookup-title"></h3><a id="lookup-source" target="_blank" rel="noopener noreferrer">作品来源</a></div>
+            <div class="section-heading"><h3 id="lookup-title" translate="no" data-i18n-ignore></h3><a id="lookup-source" target="_blank" rel="noopener noreferrer">作品来源</a></div>
             <div class="actions"><button id="lookup-organize" type="button" class="primary">用联网资料整理草稿（调用 API）</button></div>
             <p id="organize-summary" class="meta" role="status"></p>
             <div id="organized-reference" hidden>
@@ -69,11 +76,11 @@
         <section>
           <h2>翻译参考</h2>
           <label for="context">背景与已知关系</label>
-          <textarea id="context" rows="4" maxlength="1500"></textarea>
+          <textarea id="context" data-i18n-ignore rows="4" maxlength="1500"></textarea>
           <label for="tone">对白风格</label>
-          <textarea id="tone" rows="3" maxlength="600"></textarea>
+          <textarea id="tone" data-i18n-ignore rows="3" maxlength="600"></textarea>
           <label for="glossary">本作术语表（JSON）</label>
-          <textarea id="glossary" rows="7" maxlength="10000" spellcheck="false" placeholder="{}"></textarea>
+          <textarea id="glossary" data-i18n-ignore rows="7" maxlength="10000" spellcheck="false" placeholder="{}"></textarea>
           <details id="glossary-editor">
             <summary>逐项编辑草稿术语</summary>
             <p id="glossary-status" class="meta" role="status"></p>
@@ -104,15 +111,15 @@
         <p id="review-summary" class="meta"></p>
         <details id="review-details">
           <summary>实际使用的作品资料与词表</summary>
-          <dl><dt>作品 / 版本</dt><dd id="review-profile"></dd><dt>模型 / 模式</dt><dd id="review-model"></dd></dl>
-          <p id="review-reference" class="review-source"></p>
-          <pre id="review-glossary"></pre>
-          <p id="review-origins" class="meta"></p>
+          <dl><dt>作品 / 版本</dt><dd id="review-profile" translate="no" data-i18n-ignore></dd><dt>模型 / 模式</dt><dd id="review-model" translate="no" data-i18n-ignore></dd></dl>
+          <p id="review-reference" translate="no" data-i18n-ignore class="review-source"></p>
+          <pre id="review-glossary" translate="no" data-i18n-ignore></pre>
+          <p id="review-origins" translate="no" data-i18n-ignore class="meta"></p>
         </details>
         <label for="review-filter">显示条目</label>
         <select id="review-filter"><option value="issues">待核对</option><option value="all">全部</option><option value="corrected">已手动修正</option></select>
         <label for="review-query">原文 / 译文</label>
-        <div class="lookup-search"><input id="review-query" type="search" maxlength="200"><button id="review-search" type="button">筛选</button></div>
+        <div class="lookup-search"><input id="review-query" data-i18n-ignore type="search" maxlength="200"><button id="review-search" type="button">筛选</button></div>
         <div id="review-rows"></div>
         <div class="actions review-pages"><button id="review-prev" type="button">上一页</button><span id="review-page" class="meta"></span><button id="review-next" type="button">下一页</button></div>
         <p class="meta">仅已完成且缓存有效的对白可手动修正；不自动重译、不修改词表。告示仅供核对。</p>
@@ -124,6 +131,8 @@
   <script src="lib/work-lookup.js"></script>
   <script src="lib/work-profiles.js"></script>
   <script src="lib/translation-review.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-work.js"></script>
   <script src="work-lookup-ui.js"></script>
   <script src="work-review-ui.js"></script>
   <script src="work.js"></script>

@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="subtitles.css">
 </head>
 <body>
-<header><h1>外部字幕</h1><div class="row"><a href="https://assrt.net/" target="_blank" rel="noopener noreferrer">字幕服务由 assrt.net 提供</a><a href="https://subdl.com/" target="_blank" rel="noopener noreferrer">SubDL</a><a href="https://jimaku.cc/" target="_blank" rel="noopener noreferrer">Jimaku</a></div></header>
+<header><h1>外部字幕</h1><div class="row"><a href="https://assrt.net/" target="_blank" rel="noopener noreferrer">字幕服务由 assrt.net 提供</a><a href="https://subdl.com/" target="_blank" rel="noopener noreferrer">SubDL</a><a href="https://jimaku.cc/" target="_blank" rel="noopener noreferrer">Jimaku</a><label>界面语言<select data-ui-language><option value="auto">自动</option><option value="zh-Hans" data-i18n-ignore>简体中文</option><option value="zh-Hant" data-i18n-ignore>繁體中文</option><option value="en" data-i18n-ignore>English</option><option value="ja" data-i18n-ignore>日本語</option></select></label></div></header>
 <main>
   <p id="status" role="status" aria-live="polite">正在读取播放页…</p>
   <details id="settings">
@@ -71,14 +71,14 @@
     <legend>搜索</legend>
     <div class="row">
       <label>搜索名语种<select id="nameLanguage"><option value="auto">推荐名称</option><option value="zh-CN">中文简体</option><option value="zh-TW">中文繁体</option><option value="en">英文</option><option value="ja">日文</option><option value="romaji">罗马字</option><option value="und">未标语种</option></select></label>
-      <label class="grow">名称候选<select id="nameCandidates"></select></label>
+      <label class="grow">名称候选<select id="nameCandidates" data-i18n-ignore></select></label>
       <button id="useSearchName" type="button">使用此名称</button>
       <button id="officialNames" type="button">查询官方名称</button>
       <button id="aiNames" type="button" disabled>AI 补充名称…</button>
     </div>
     <form id="searchForm" class="row">
       <label>字幕源<select id="source"><option value="assrt">assrt</option><option value="subdl">SubDL</option><option value="jimaku">Jimaku（日文为主）</option></select></label>
-      <label class="grow">关键词<input id="query" list="keywords" minlength="3" maxlength="200" required><datalist id="keywords"></datalist></label>
+      <label class="grow">关键词<input id="query" list="keywords" minlength="3" maxlength="200" required><datalist id="keywords" data-i18n-ignore></datalist></label>
       <label class="check" id="fileModeLabel"><input id="fileMode" type="checkbox">按视频文件名搜索（忽略压制信息）</label>
       <label id="subdlLanguageLabel" hidden>候选语言<select id="subdlLanguage"><option value="zh">中文（简 / 繁）</option><option value="en">英语</option><option value="ja">日语</option><option value="all">全部语言</option></select></label>
       <label id="jimakuAnilistLabel" hidden>AniList ID<input id="jimakuAnilist" type="number" min="1" max="2147483647" step="1"></label>
@@ -90,23 +90,23 @@
   </fieldset>
   <section aria-label="字幕候选" id="results"></section>
   <section id="fileSection" hidden>
-    <h2 id="selectedTitle">文件</h2>
-    <div class="row"><label class="grow">字幕版本<select id="versions"></select></label><button id="aiFiles" type="button" disabled>AI 辅助识别…</button></div>
+    <h2 id="selectedTitle" data-i18n-ignore>文件</h2>
+    <div class="row"><label class="grow">字幕版本<select id="versions" data-i18n-ignore></select></label><button id="aiFiles" type="button" disabled>AI 辅助识别…</button></div>
     <p id="groupInfo" class="muted"></p>
     <div class="row">
-      <label class="grow">文件<select id="files"></select></label>
+      <label class="grow">文件<select id="files" data-i18n-ignore></select></label>
       <label>编码<select id="encoding"><option value="auto">自动</option><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option><option value="big5">Big5</option><option value="shift_jis">Shift-JIS</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option></select></label>
       <button id="preview" type="button">下载并预览</button>
       <button id="openDownload" type="button">在浏览器中打开文件</button>
     </div>
     <details id="mapEditor">
       <summary>集数对应校正 <span id="mapInfo"></span></summary>
-      <div class="table-wrap"><table class="mapping-table"><thead><tr><th>本版本</th><th>集数</th><th>文件</th></tr></thead><tbody id="mappingRows"></tbody></table></div>
+      <div class="table-wrap"><table class="mapping-table"><thead><tr><th>本版本</th><th>集数</th><th>文件</th></tr></thead><tbody id="mappingRows" data-i18n-ignore></tbody></table></div>
       <div class="row"><button id="confirmMap" type="button">确认集数对应</button><button id="resetMap" type="button">恢复本地识别</button></div>
     </details>
   </section>
   <section id="previewSection" hidden>
-    <h2 id="previewTitle">字幕预览</h2>
+    <h2 id="previewTitle" data-i18n-ignore>字幕预览</h2>
     <p id="previewInfo" class="muted"></p>
     <div class="row"><label class="check"><input id="followCollection" type="checkbox">跟随此字幕合集</label><label class="check"><input id="inheritOffset" type="checkbox" disabled>后续集沿用当前偏移</label></div>
     <div class="row timing">
@@ -120,11 +120,13 @@
     <div class="row"><span id="marks" class="muted">未标记同步点</span><button id="clearMarks" type="button">清除标记</button></div>
     <div class="row"><span id="seriesInfo" class="muted"></span><button id="useSeries" type="button" hidden>采用系列偏移</button><label class="check"><input id="remember" type="checkbox">保存为系列偏移建议</label></div>
     <div class="row"><label class="grow">筛选字幕<input id="filter" type="search" maxlength="200"></label><button id="apply" class="primary" type="button">加载到当前播放页</button></div>
-    <div class="table-wrap"><table><thead><tr><th scope="col">序号</th><th scope="col">原时间</th><th scope="col">调整后</th><th scope="col">字幕</th><th scope="col">同步点</th></tr></thead><tbody id="cues"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th scope="col">序号</th><th scope="col">原时间</th><th scope="col">调整后</th><th scope="col">字幕</th><th scope="col">同步点</th></tr></thead><tbody id="cues" data-i18n-ignore></tbody></table></div>
     <div class="row spread"><span id="cueInfo" class="muted"></span><div class="row"><button id="cuePrevious" type="button">上一页</button><button id="cueNext" type="button">下一页</button></div></div>
   </section>
 </main>
 <script src="lib/protocol.js"></script>
+<script src="lib/i18n.js"></script>
+<script src="lib/i18n-subtitles.js"></script>
 <script src="lib/work-profiles.js"></script>
 <script src="lib/opencc.js"></script>
 <script src="lib/search-names.js"></script>

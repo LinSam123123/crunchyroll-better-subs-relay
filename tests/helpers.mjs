@@ -53,8 +53,7 @@ export function background({ data = {}, fetcher, secure = true, allowed = true }
       action: { setBadgeText: async () => {} },
     },
   });
-  ctx.importScripts = (...paths) => paths.forEach(p => load(ctx, p));
-  load(ctx, 'background.js');
+  load(ctx, JSON.parse(source('manifest.json')).background.service_worker);
   const popup = { id: 'test-extension', url: 'chrome-extension://test-extension/translation.html' };
   const content = { id: 'test-extension', url: 'https://www.crunchyroll.com/watch/ABC/title', frameId: 0, tab: { id: 1 } };
   async function send(type, payload, sender = popup) {

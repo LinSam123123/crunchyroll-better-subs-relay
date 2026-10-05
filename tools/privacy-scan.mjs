@@ -5,7 +5,7 @@ import path from 'node:path';
 import { unzipSync } from 'fflate';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const topFiles = new Set(['README.md', 'README.ja.md', 'AGENTS.md', 'CONTRIBUTING.md', 'LICENSE',
+const topFiles = new Set(['README.md', 'README.en.md', 'README.ja.md', 'README.ko.md', 'AGENTS.md', 'CONTRIBUTING.md', 'LICENSE',
   'NOTICE.md', 'THIRD_PARTY_NOTICES.md', '.gitignore', '.gitattributes', 'package.json', 'package-lock.json', 'upstream-files.json']);
 const skipped = new Set(['.git', 'node_modules', 'artifacts']);
 const patterns = [

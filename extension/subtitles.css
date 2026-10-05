@@ -18,9 +18,11 @@ label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .number { flex: 0 0 72px; }
 .check { flex-direction: row; align-items: center; min-height: 36px; }
 input, select, button, .file { min-height: 36px; font: inherit; color: inherit; }
-input, select { width: 100%; background: #fff; border: 1px solid #aab8bb; border-radius: 4px; padding: 6px 9px; }
+input, select { width: 100%; max-width: 100%; min-width: 0; background: #fff; border: 1px solid #aab8bb; border-radius: 4px; padding: 6px 9px; }
+.ui-language { max-width: 250px; }
+label, button, .file { overflow-wrap: anywhere; }
 input[type=checkbox] { width: 16px; min-height: 16px; flex-shrink: 0; accent-color: #087a75; }
-button, .file { display: inline-flex; justify-content: center; align-items: center; padding: 6px 12px; border: 1px solid #aab8bb; border-radius: 4px; background: #fff; cursor: pointer; }
+button, .file { display: inline-flex; max-width: 100%; min-width: 0; justify-content: center; align-items: center; padding: 6px 12px; border: 1px solid #aab8bb; border-radius: 4px; background: #fff; cursor: pointer; }
 button:hover, .file:hover { background: #e9f1f0; }
 button:disabled { opacity: .45; cursor: default; }
 button.primary { background: #087a75; color: #fff; border-color: #087a75; }

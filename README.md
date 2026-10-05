@@ -1,6 +1,6 @@
 # Crunchyroll Better Subs Relay
 
-[日本語](README.ja.md) · [AI agent 指南](AGENTS.md) · [下载 Beta](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases)
+[English](README.en.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [AI agent 指南](AGENTS.md) · [下载 Beta](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases)
 
 一个非官方的 Crunchyroll 字幕扩展。可以选官方字幕、寻找外部字幕，也可以在没有合适字幕时用自己的翻译 API。现在是 **Beta 尝鲜版**，欢迎反馈，但请不要把 API Key 或完整字幕发到公开 Issue。
 
@@ -14,19 +14,30 @@
 - 使用 DeepL 或自选 OpenAI 兼容接口翻译。支持分批、并发、流式输出，已翻译的部分可先显示，失败后可续译。
 - 选择搜索用的作品名：官方地区名称、已有资料、离线简繁转换。AI 名称候选和文件集数分析是可选的，确认后才使用。
 - 可导出字幕用于个人校对，保存作品资料与术语辅助翻译。
+- 界面支持简体中文、繁体中文、英文和日文，默认跟随浏览器语言，也可以单独选择。
 
 **没有翻译 API 也能用。** 选官方轨或导入本地文件不需要翻译 Key。外部字幕网站各自需要自己的 Key；Jimaku 主要是日文字幕，不保证有中文。
 
 ## 安装：Edge / Chrome
 
-1. 到 [Releases](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases) 下载 `crunchyroll-better-subs-relay-2.7.0.30-beta.zip`，解压到一个准备长期保留的文件夹。
+1. 到 [Releases](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases) 下载最新的 `crunchyroll-better-subs-relay-版本号-beta.zip`，解压到一个准备长期保留的文件夹。
 2. 打开 `edge://extensions` 或 `chrome://extensions`，开启「开发人员模式」，点击「加载解压缩的扩展」，选择 **直接包含 manifest.json 的文件夹**。
 3. 先停用原版 Better Subs 和其他同类字幕扩展，避免两个扩展同时接管字幕。不要删除原来的设置。
 4. 刷新 Crunchyroll 播放页一次，登录并使用你正常有权观看的内容。
 
-更新时解压新版，重新加载扩展并刷新播放页。不要删除正在加载的文件夹。源代码用户也可以直接加载仓库中的 `extension/`。
+源代码用户也可以直接加载仓库中的 `extension/`。
+
+## 更新：保留 Key 和设置
+
+1. 停止翻译，在扩展管理页暂时关闭扩展。
+2. 将新版 ZIP 解压到临时目录，再把包内文件完整覆盖到**原来的加载目录**。保留文件夹路径，`manifest.json` 要保持在原来的层级，不要多套一层文件夹。
+3. 重新启用并「重新加载」扩展，确认版本号，再刷新 Crunchyroll 播放页。
+
+在同一浏览器配置中按原路径更新，无需卸载或重新填写 Key。不要先「删除 / 移除扩展」，也不要安装成第二份。若更新后后台无法启动，先保存网页上未提交的内容，完全退出浏览器（包括后台进程）再重开。不要通过清空扩展存储或关闭浏览器安全保护排查。
 
 ## 第一次使用
+
+**选择界面语言：** 在扩展弹窗或翻译设置的「界面语言」中选择。语言包随扩展安装，不需要 API，也不会更改字幕原文、目标语言或密钥设置。
 
 **只想看字幕：** 打开播放器的 Better Subs 字幕菜单，先看有没有合适的官方轨。
 
@@ -49,7 +60,7 @@
 
 ## 已知限制
 
-- 当前界面以中文和英文为主；日文 README 不等于界面已完整日文化。
+- 界面语言不会翻译字幕文件名、作品名、字幕正文或用户填写的资料；这些内容保留原样。第三方服务返回的数据也可能使用其他语言。
 - 官方地区名称是尽力获取：可能跳转、缺语言或受地区影响。离线简繁转换不一定得到当地通用译名。
 - 特别篇、同集多个修订版、缺集或命名不明确时会要求手动选择。跟随限于确认的作品/季/版本，不能保证所有文件名自动识别。
 - 外部字幕不保证与当前视频自动对齐；跨语言自动时间轴对齐尚未完成。
@@ -69,4 +80,4 @@ npm run privacy
 npm run package
 ```
 
-浏览器回归与架构见 [AGENTS.md](AGENTS.md)。贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。许可与来源见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本分支以商店 2.7.0 的本地副本为基线，并非原作者最新 2.8.2 的等价版本。
+浏览器回归与架构见 [AGENTS.md](AGENTS.md)。贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。许可与来源见 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本分支以商店 2.7.0 的本地副本为基线，并非原作者 2.8.2 的等价版本。

@@ -23,6 +23,11 @@
   'use strict';
 
   const NS = (typeof self !== 'undefined' ? self : globalThis);
+  const t = (source, params) => NS.CRSubFix?.i18n?.t(source, params) ?? source;
+  const uiText = (el, source) => {
+    if (NS.CRSubFix?.playerI18n) NS.CRSubFix.playerI18n.text(el, source);
+    else el.textContent = t(source);
+  };
   // Shared visual tokens (lib/ui-theme.js, loaded earlier).  Fall back to the
   // prior literals if it's somehow absent, so toasts never break.
   const T = (NS.CRSubFix && NS.CRSubFix.uiTheme && NS.CRSubFix.uiTheme.tokens) || {};
@@ -49,7 +54,7 @@
       target.style.position = 'relative';
     }
     const toast = document.createElement('div');
-    toast.textContent = text;
+    uiText(toast, text);
     Object.assign(toast.style, {
       position:      isAbsolute ? 'absolute' : 'fixed',
       bottom:        isAbsolute ? '18%'      : '120px',
@@ -67,8 +72,11 @@
       zIndex:        String(zIndex),
       opacity:       '1',
       transition:    'opacity 0.6s ease',
-      whiteSpace:    'nowrap',
-      letterSpacing: '0.3px',
+      whiteSpace:    'normal',
+      maxWidth:      'calc(100% - 24px)',
+      overflowWrap:  'anywhere',
+      boxSizing:     'border-box',
+      letterSpacing: '0',
     });
     target.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; }, duration);
@@ -148,7 +156,7 @@
       const accent = T.accent || '#ff6b35';
       h.innerHTML =
         `<div style="margin-bottom:5px;color:${accent};font-weight:700;letter-spacing:0.5px;">` +
-          `${total > 0 ? `${step}/${total}` : '…'}  <span style="color:rgba(255,255,255,0.5);">│</span>  ${desc}` +
+          `${total > 0 ? `${step}/${total}` : '…'}  <span style="color:rgba(255,255,255,0.5);">│</span>  ${t(desc)}` +
         `</div>` +
         `<div role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" style="height:3px;background:rgba(255,255,255,0.12);border-radius:1px;overflow:hidden;">` +
           `<div style="width:${pct}%;height:100%;background:${accent};border-radius:1px;transition:width 0.25s ease;"></div>` +
@@ -159,6 +167,7 @@
       const h = el();
       if (!h) return;
       h.innerHTML = content;
+      NS.CRSubFix?.i18n?.localize(h);
       if (fadeAfterMs > 0) hudTimers.get(h).fade = setTimeout(() => fadeElement(h), fadeAfterMs);
     }
 
@@ -178,7 +187,7 @@
       h.style.pointerEvents = 'auto';
       h.dataset.state = 'error';
       const message = document.createElement('div');
-      message.textContent = text;
+      uiText(message, text);
       message.style.padding = '6px 0 10px';
       h.appendChild(message);
       const actions = document.createElement('div');
@@ -190,7 +199,7 @@
         if (!handler) continue;
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = label;
+        uiText(button, label);
         button.style.cssText = 'padding:6px 14px;background:#303838;color:#fff;border:1px solid #91a4a0;border-radius:4px;cursor:pointer;font:inherit';
         button.addEventListener('click', event => { event.stopPropagation(); handler(); });
         actions.appendChild(button);

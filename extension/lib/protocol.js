@@ -126,7 +126,12 @@
     SET_SETTING:   'CR_SUB_SET_SETTING',
   };
 
-  const protocol = { ATTR, STATUS, MSG, POST };
+  function isBackgroundSender(runtime, sender) {
+    const worker = runtime.getManifest()?.background?.service_worker;
+    return typeof worker === 'string' && sender?.id === runtime.id && sender?.url === runtime.getURL(worker);
+  }
+
+  const protocol = { ATTR, STATUS, MSG, POST, isBackgroundSender };
 
   const NS = (typeof self !== 'undefined' ? self : globalThis);
   NS.CRSubFix = NS.CRSubFix || {};

@@ -10,9 +10,19 @@
   <header>
     <img src="icons/icon48.png" alt="" width="36" height="36">
     <div><h1>Better Subs</h1><p>Private Relay · 翻译服务</p></div>
-    <span class="version">2.7.0 + Relay 15</span>
+    <span id="version" class="version" data-i18n-ignore></span>
   </header>
   <main>
+    <section>
+      <label for="ui-language">界面语言</label>
+      <select id="ui-language" data-ui-language>
+        <option value="auto">跟随浏览器</option>
+        <option value="zh-Hans" translate="no" data-i18n-ignore>简体中文</option>
+        <option value="zh-Hant" translate="no" data-i18n-ignore>繁體中文</option>
+        <option value="en" translate="no" data-i18n-ignore>English</option>
+        <option value="ja" translate="no" data-i18n-ignore>日本語</option>
+      </select>
+    </section>
     <form id="settings">
       <fieldset id="fields" disabled>
         <section>
@@ -21,25 +31,25 @@
           <select id="provider"><option value="relay">自选中转 API</option><option value="deepl">DeepL API</option></select>
           <fieldset id="relayFields">
             <label for="baseUrl">Base URL</label>
-            <input id="baseUrl" type="url" placeholder="https://your-provider.example/v1" spellcheck="false" autocomplete="off" required>
+            <input id="baseUrl" type="url" placeholder="https://your-provider.example/v1" translate="no" data-i18n-ignore spellcheck="false" autocomplete="off" required>
             <div class="grid">
               <div><label for="protocol">接口协议</label><select id="protocol"><option value="chat-completions">Chat Completions</option><option value="responses">Responses</option></select></div>
               <div><label for="model">模型 ID</label><input id="model" placeholder="模型名称" spellcheck="false" maxlength="200" required></div>
             </div>
           </fieldset>
-          <label for="apiKey">API Key <span id="keyState"></span></label>
-          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" maxlength="4096" placeholder="输入密钥">
+          <label for="apiKey">API Key <span id="keyState" data-i18n-ignore></span></label>
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" maxlength="4096" data-i18n-ignore placeholder="输入密钥">
         </section>
         <section>
           <h2>字幕</h2>
           <div class="grid">
-            <div><label for="source">默认原文</label><select id="source"></select></div>
-            <div><label for="target">默认译文</label><select id="target"></select></div>
+            <div><label for="source">默认原文</label><select id="source" data-i18n-ignore></select></div>
+            <div><label for="target">默认译文</label><select id="target" data-i18n-ignore></select></div>
           </div>
           <label for="translationMode">翻译模式</label>
           <select id="translationMode"><option value="batch">分批翻译</option><option value="episode-stream">整集流式（实验）</option></select>
           <label for="glossary">术语表（JSON，可选）</label>
-          <textarea id="glossary" rows="4" spellcheck="false" maxlength="12000" placeholder='{"Roxy":"洛琪希","Eris":"艾莉丝","Man-God":"人神"}'></textarea>
+          <textarea id="glossary" rows="4" spellcheck="false" maxlength="12000" translate="no" data-i18n-ignore placeholder='{"Roxy":"洛琪希","Eris":"艾莉丝","Man-God":"人神"}'></textarea>
           <label class="check work-toggle"><input id="workEnabled" type="checkbox">作品资料辅助翻译</label>
           <a href="work.html">已确认的作品资料</a>
         </section>
@@ -49,7 +59,7 @@
             <div><label for="batchSize">每批最多条数</label><input id="batchSize" type="number" min="1" max="50" step="1" required></div>
             <div><label for="concurrency">并发请求</label><select id="concurrency"><option value="1">1</option><option value="2">2</option></select></div>
             <div><label for="maxChars">每批最多字符</label><input id="maxChars" type="number" min="500" max="12000" step="100" required></div>
-            <div><label for="timeout" id="timeoutLabel">超时（秒）</label><input id="timeout" type="number" min="5" max="120" step="1" required></div>
+            <div><label for="timeout" id="timeoutLabel" data-i18n-ignore>超时（秒）</label><input id="timeout" type="number" min="5" max="120" step="1" required></div>
           </div>
         </section>
         <div class="actions">
@@ -58,13 +68,15 @@
           <button id="clear" type="button" class="danger">删除密钥</button>
         </div>
       </fieldset>
-      <p id="status" role="status" aria-live="polite">正在读取设置…</p>
-      <output id="sample" hidden></output>
+      <p id="status" role="status" aria-live="polite" data-i18n-ignore>正在读取设置…</p>
+      <output id="sample" translate="no" data-i18n-ignore hidden></output>
     </form>
     <footer>字幕文本仅发送至所选服务。机器翻译可能有误。<br>密钥保存在此浏览器的扩展本地存储中，不同步。</footer>
   </main>
   <script src="lib/protocol.js"></script>
   <script src="lib/relay.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-translation.js"></script>
   <script src="translation.js"></script>
 </body>
 </html>

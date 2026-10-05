@@ -16,6 +16,7 @@
   'use strict';
 
   const SCHEMA = [
+    { key: 'uiLanguage',           attr: 'data-cr-ui-language',    default: 'auto',     type: 'string' },
     { key: 'enabled',              attr: 'data-cr-sub-fix',        default: true,       type: 'bool'   },
     { key: 'autoActivate',         attr: 'data-cr-auto-activate',  default: false,      type: 'bool'   },
     { key: 'hideOfficialSubs',     attr: 'data-cr-hide-official',  default: false,      type: 'bool'   },

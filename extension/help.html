@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hans">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -41,6 +41,17 @@
       line-height: 1.6;
     }
     main { max-width: 780px; margin: 0 auto; padding: 40px 20px 80px; }
+    body { overflow-wrap: anywhere; }
+    .flow > *, .screen, .node, .mockpanel { min-width: 0; max-width: 100%; }
+    .flow, .controls, .playerbar { flex-wrap: wrap; }
+    .screen .band, .screen .sign { max-width: calc(100% - 16px); white-space: normal; overflow-wrap: anywhere; }
+    @media (max-width: 560px) {
+      main { padding: 24px 12px 48px; }
+      .flow { gap: 8px; }
+      .node { flex: 1 1 110px; }
+      nav { flex-wrap: wrap; }
+      .mockpanel { width: 100%; }
+    }
 
     /* ── Hero ── */
     .hero { text-align: center; margin-bottom: 26px; }
@@ -341,7 +352,22 @@
     footer { margin-top: 40px; text-align: center; color: var(--text-mute); font-size: 12px; }
     @media (max-width: 560px) {
       section { padding: 18px 16px 14px; }
-      .timeline { grid-template-columns: 56px 1fr; }
+      .timeline { grid-template-columns: 56px minmax(0, 1fr); }
+      nav { margin: 0 -12px 24px; padding: 10px 12px; flex-wrap: wrap; overflow-x: visible; }
+      nav a { max-width: 100%; white-space: normal; }
+      .diagram { width: 100%; min-width: 0; padding: 14px; overflow-x: visible; }
+      .flow { min-width: 0; gap: 8px; }
+      .flow > .node, .flow > .screen { flex: 1 1 100%; min-width: 0; width: 100%; }
+      .flow > .arrow { flex: 0 0 100%; text-align: center; transform: rotate(90deg); }
+      .screen, .mockpanel, .preview .explain { min-width: 0; max-width: 100%; }
+      .preview .screen { flex: 1 1 100%; max-width: 100%; }
+      .mockpanel .mp-row > span { min-width: 0; overflow-wrap: anywhere; }
+      .playerbar, .setting, .controls { min-width: 0; }
+      .setting > span:first-child { min-width: 0; }
+      .controls label { max-width: 100%; }
+      .cycle { min-width: 0; width: calc(100% - 16px); text-align: center; }
+      .cycle span:not(:first-child) { width: 100%; white-space: normal; }
+      h2 .num { flex-shrink: 0; }
     }
   </style>
 </head>
@@ -517,8 +543,8 @@
         </label>
       </div>
       <div class="screen" style="max-width:460px;">
-        <span class="sign">駅 → Station</span>
-        <span class="band pri">I'm heading home.</span>
+        <span class="sign" data-i18n-ignore>駅 → Station</span>
+        <span class="band pri" data-i18n-ignore>I'm heading home.</span>
       </div>
       <div class="callout c-both"><b>Both layers on</b> — spoken lines at the bottom, translated signs where the original text sits.
         <span class="where">These are the same rows you'll find in the popup and in ▾ → Show on screen.</span></div>
@@ -580,8 +606,8 @@
       </div>
       <div class="screen" style="max-width:460px;">
         <span class="tag">learning mode</span>
-        <span class="band sec"><span class="base">I'm heading home.</span><span class="alt">もう家に帰るね。</span></span>
-        <span class="band pri"><span class="base">もう家に帰るね。</span><span class="alt">I'm heading home. (CC)</span></span>
+        <span class="band sec" data-i18n-ignore><span class="base">I'm heading home.</span><span class="alt">もう家に帰るね。</span></span>
+        <span class="band pri" data-i18n-ignore><span class="base">もう家に帰るね。</span><span class="alt">I'm heading home. (CC)</span></span>
       </div>
       <div class="callout c-jp"><b>Japanese audio</b> — the primary band shows Japanese (read what you hear), your language sits above for support.
         <span class="where">Real thing: ▾ → 📚 Match my audio.</span></div>
@@ -669,5 +695,8 @@
     Better Subs for Crunchyroll · questions or bugs → the popup's <b>Help &amp; feedback</b> section
   </footer>
 </main>
+  <script src="lib/settings-schema.js"></script>
+  <script src="lib/i18n.js"></script>
+  <script src="lib/i18n-player.js"></script>
 </body>
 </html>
