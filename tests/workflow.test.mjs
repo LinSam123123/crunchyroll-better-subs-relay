@@ -17,7 +17,7 @@ function workflow(options = {}) {
     setTimeout: (f, ms) => ms >= 20000 ? setTimeout(f, ms) : (f(), 1),
     clearTimeout,
     currentEp: () => ep, isMtEnabled: () => state.enabled, isMtConfigured: () => true,
-    getMtTarget: () => 'zh-CN', getMtProvider: () => 'relay', getMtSourcePref: () => 'en-US',
+    getMtTarget: () => 'zh-CN', getMtProvider: () => options.provider || 'relay', getMtSourcePref: () => 'en-US',
     SETTINGS: { read: (_html, key) => key === 'mtWorkEnabled' ? !!options.work :
       key === 'mtTranslationMode' ? (options.stream ? 'episode-stream' : 'batch') : state.tag },
     html: {}, mtLangLabel: l => l, MT_PROVIDER_LABELS: { relay: 'Relay' },
@@ -422,6 +422,25 @@ test('explicit retry fails closed when episode/config changes instead of startin
   await w.actions[0].retry();
   assert.equal(w.requests.length, 1);
   assert.match(w.errors.at(-1), /RESUME_CONTEXT_CHANGED/);
+});
+
+test('local translation publishes one cue before completion and resumes without repeating it', async () => {
+  let release;
+  const w = workflow({ provider: 'local', rpc: (p, n) => n === 1 ? new Promise(resolve => { release = resolve; })
+    : { ok: true, translations: p.texts.map(text => `Local: ${text}`) } });
+  const running = w.ctx.run();
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  w.ctx.pause(); release({ ok: true, translations: ['Local: Hello'] });
+  await running;
+  assert.equal(w.requests[0].provider, 'local');
+  assert.equal(w.requests.length, 1);
+  assert.equal([...w.tracks.values()][0].srcCues[0].text, 'Local: Hello');
+  assert.equal([...w.tracks.values()][0].srcCues[1].translationStatus, 'pending');
+  await w.state.resume();
+  assert.deepEqual(w.requests[1].texts, ['World']);
+  assert.equal([...w.tracks.values()][0].incomplete, false);
+  await w.ctx.run();
+  assert.equal(w.requests.length, 2);
 });
 test('requests carry actual subtitle indices and timing for audit, without changing cue ids or ordering', async () => {
   const w = workflow();

@@ -1529,6 +1529,11 @@
       CACHE_SAVE_FAILED: 'Translation is retained in this page but extension storage failed. Do not refresh.',
       CONFIG_CHANGED: 'Translation settings changed. Start translation again.',
       KEY_REQUIRED: 'Add an API key in Translation settings.',
+      LOCAL_NOT_READY: 'Open Translation settings and prepare local translation. Keep that tab open.',
+      LOCAL_LANGUAGE: 'Prepare the matching source and target languages in Translation settings.',
+      LOCAL_TIMEOUT: 'Local translation timed out. Completed subtitles are kept; retry when ready.',
+      LOCAL_FAILED: 'Local translation failed. Prepare the engine again in Translation settings.',
+      LOCAL_INVALID_OUTPUT: 'Local translation returned no usable text. Retry when ready.',
       HOST_PERMISSION_REQUIRED: 'Save and authorize the provider in Translation settings.',
       TRANSLATION_DISABLED: 'Machine translation is disabled.',
       BUDGET_EXCEEDED: 'Hourly safety limit reached for this tab (100,000 characters / 200 requests).',
@@ -1736,7 +1741,7 @@
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const TUNE  = mtTuning(provider);
     if (opts?.batchSize) TUNE.batch = Math.min(TUNE.batch, opts.batchSize);
-    const PACE  = provider === 'relay' ? 0 : TUNE.pace;
+    const PACE  = provider === 'deepl' ? TUNE.pace : 0;
     const texts = cues.map(c => c.text);
     // Also translate the base track's typeset signs: extract their text and append
     // it to the batch so it rides the same retry/resume/quota path as dialogue.
@@ -2597,9 +2602,8 @@
     ['it-IT', 'Italiano'], ['ru-RU', 'Русский'],
   ];
   const getMtProvider = () => SETTINGS.read(html, 'mtProvider') || 'relay';
-  const MT_PROVIDER_LABELS = { deepl: 'DeepL', relay: 'Custom Relay' };
-  // MT tracks are keyed by target AND provider (provider is always 'deepl' now,
-  // but the key shape is kept stable so existing saved tracks still resolve).
+  const MT_PROVIDER_LABELS = { deepl: 'DeepL', relay: 'Custom Relay', local: 'Browser Local' };
+  // Provider identity keeps local and cloud translation tracks separate.
   const mtId = (target, provider, tag, source, hash) => `custom:mt:relay1:${target}:${provider}:${tag}:${source}:${hash}`;
 
   // Runtime-tunable throughput knobs so the sweet spot for each API can be found

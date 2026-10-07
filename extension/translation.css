@@ -37,6 +37,9 @@ button:disabled { opacity: .5; cursor: default; }
 #status[data-error="true"] { color: #ffb59f; }
 #sample { display: block; border-left: 3px solid #70d5ad; padding: 12px 18px; margin: 12px 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 [hidden], #sample[hidden] { display: none; }
+#localFields p { margin: 14px 0; line-height: 1.6; color: #a7c9bd; }
+#localFields button { margin: 4px 8px 4px 0; }
+#localProgress { width: 100%; height: 12px; margin-top: 14px; accent-color: #70d5ad; }
 footer { color: #93a6a2; font-size: 12px; line-height: 1.8; margin: 30px 0 12px; }
 a { color: #8ce0bd; }
 .work-toggle { margin-top: 20px; white-space: normal; }

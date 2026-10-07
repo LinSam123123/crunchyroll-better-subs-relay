@@ -70,6 +70,7 @@ test('bundled catalogs cover all four locales and preserve substitution slots', 
   }
   const I = ctx.CRSubFix.i18n;
   const slots = text => [...String(text).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
+  load(ctx, 'lib/i18n-local.js');
   const catalog = I.catalog();
   assert.ok(Object.keys(catalog).length > 100);
   for (const [source, entry] of Object.entries(catalog)) {

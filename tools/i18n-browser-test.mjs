@@ -73,6 +73,28 @@ try {
       await page.screenshot({ path: path.join(output, `${file}-${language}-mobile.png`), fullPage: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${file}: mobile overflow`);
       await page.setViewportSize({ width: 1180, height: 900 });
+      if (file === 'popup.html') {
+        // A toolbar host starts narrow and expands to the document's preferred size.
+        await page.setViewportSize({ width: 180, height: 600 });
+        const preferredWidth = await page.locator('html').evaluate(el => el.getBoundingClientRect().width);
+        assert.equal(preferredWidth, 360, 'popup must request a readable width from a narrow host');
+        await page.setViewportSize({ width: preferredWidth, height: 600 });
+        const layout = await page.evaluate(() => {
+          const version = document.querySelector('.app-version');
+          const range = document.createRange();
+          range.selectNodeContents(version);
+          return {
+            overflow: document.documentElement.scrollWidth > innerWidth,
+            versionLines: range.getClientRects().length,
+            labelWidths: [...document.querySelectorAll('.signpost-item .nm')].map(el => el.getBoundingClientRect().width),
+          };
+        });
+        assert.equal(layout.overflow, false, 'popup horizontal overflow');
+        assert.equal(layout.versionLines, 1, 'version must stay on one line');
+        assert.ok(layout.labelWidths.every(width => width >= 140), 'action labels need readable line lengths');
+        await page.screenshot({ path: path.join(output, `popup-${language}-toolbar.png`) });
+        await page.setViewportSize({ width: 1180, height: 900 });
+      }
       checks.push(`${file}: ${language} desktop/mobile`);
     }
     // Reset before the next page to exercise browser-default selection again.

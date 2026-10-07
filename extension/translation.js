@@ -60,6 +60,9 @@ function status(text, error = false, params) {
   el('status').dataset.error = String(error);
 }
 function failure(e) {
+  if (self.CRSubFix.localErrors?.[e.message]) {
+    status(self.CRSubFix.localErrors[e.message], true); return;
+  }
   if (e.message === 'INCOMPLETE_RESPONSE' && el('translationMode').value === 'episode-stream') {
     status('流式输出未完整结束，请核对接口和模型的输出限制。不会自动重发请求。', true);
   } else if (errors[e.message]) {
@@ -77,13 +80,25 @@ async function send(type, payload) {
 }
 function providerVisibility() {
   const relay = el('provider').value === 'relay';
+  const local = el('provider').value === 'local';
+  el('localFields').hidden = !local;
+  el('apiKey').hidden = local;
+  el('keyLabel').hidden = local;
+  el('apiKey').disabled = local;
+  el('clear').hidden = local;
+  el('cloudTranslationFields').hidden = local;
+  el('localPrivacy').hidden = !local;
+  el('cloudPrivacy').hidden = local;
+  for (const id of ['batchSize', 'maxChars', 'concurrency']) el(id).parentElement.hidden = local;
+  el('save').textContent = t(local ? 'Save local settings' : '保存并授权');
+  el('test').textContent = t(local ? 'Test local translation' : '测试连接');
   el('relayFields').hidden = !relay;
   el('relayFields').disabled = !relay;
   el('translationMode').disabled = !relay;
   el('glossary').disabled = !relay;
   el('workEnabled').disabled = !relay;
   const stream = relay && el('translationMode').value === 'episode-stream';
-  for (const id of ['batchSize', 'maxChars', 'concurrency']) el(id).disabled = stream;
+  for (const id of ['batchSize', 'maxChars', 'concurrency']) el(id).disabled = stream || local;
   el('timeoutLabel').textContent = t(stream ? '首段／空闲超时（秒）' : '超时（秒）');
 }
 function refreshUiLanguage() {
@@ -117,13 +132,14 @@ function fill(state) {
   el('apiKey').value = '';
   el('apiKey').placeholder = t(state.hasKey ? '留空保留当前密钥' : '输入密钥');
   el('keyState').textContent = t(state.hasKey ? '已保存' : '未设置');
-  el('test').disabled = !state.hasKey || !state.authorized;
+  el('test').disabled = c.provider !== 'local' && (!state.hasKey || !state.authorized);
+  el('localPrepare').disabled = c.provider !== 'local';
   el('clear').disabled = !state.hasKey;
   providerVisibility();
 }
 function payload() {
   let glossary;
-  try { glossary = JSON.parse(el('glossary').value.trim() || '{}'); }
+  try { glossary = el('provider').value === 'local' ? {} : JSON.parse(el('glossary').value.trim() || '{}'); }
   catch (_) { throw new Error('INVALID_GLOSSARY'); }
   return {
     config: R.config({
@@ -145,6 +161,7 @@ function setBusy(value) {
 el('provider').addEventListener('change', providerVisibility);
 el('translationMode').addEventListener('change', providerVisibility);
 el('settings').addEventListener('input', () => {
+  el('localPrepare').disabled = true;
   el('test').disabled = true;
   el('sample').hidden = true;
   status('有未保存的更改');
@@ -155,11 +172,11 @@ el('settings').addEventListener('submit', async e => {
   try {
     const p = payload();
     // Request permission in the click/submit gesture, before the first await.
-    const origins = p.config.provider === 'relay'
+    const origins = p.config.provider === 'local' ? [] : p.config.provider === 'relay'
       ? [R.originPattern(p.config.baseUrl)]
       : p.apiKey ? [R.originPattern(R.host(p.config, p.apiKey))]
         : ['https://api-free.deepl.com/*', 'https://api.deepl.com/*'];
-    const permission = chrome.permissions.request({ origins });
+    const permission = p.config.provider === 'local' ? Promise.resolve(true) : chrome.permissions.request({ origins });
     setBusy(true); status('正在保存…');
     if (!await permission) throw new Error('PERMISSION_DENIED');
     fill(await send(MSG.MT_SAVE_CONFIG, p));
@@ -193,7 +210,10 @@ send(MSG.MT_GET_CONFIG).then(state => {
   fill(state); el('fields').disabled = false;
   if (new URL(location.href).searchParams.get('target') === 'ja-JP') {
     el('target').value = 'ja-JP';
+    el('localPrepare').disabled = true;
+    el('test').disabled = true;
     status('日文目标已选，尚未保存或开始翻译。'); return;
   }
-  status(state.hasKey ? (state.authorized ? '设置已载入。' : '服务地址需要重新授权。') : '尚未配置翻译服务。');
+  status(state.config.provider === 'local' ? 'Local settings loaded. Prepare the engine before translating.' :
+    state.hasKey ? (state.authorized ? '设置已载入。' : '服务地址需要重新授权。') : '尚未配置翻译服务。');
 }).catch(failure);

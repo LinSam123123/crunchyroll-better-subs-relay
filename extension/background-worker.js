@@ -341,7 +341,7 @@
     return n;
   }
   function config(input) {
-    if (!input || !['relay', 'deepl'].includes(input.provider)) fail('INVALID_PROVIDER');
+    if (!input || !['relay', 'deepl', 'local'].includes(input.provider)) fail('INVALID_PROVIDER');
     if (input.protocol && !['chat-completions', 'responses'].includes(input.protocol)) fail('INVALID_PROTOCOL');
     if (input.translationMode && !['batch', 'episode-stream'].includes(input.translationMode)) fail('INVALID_MODE');
     const glossary = input.glossary ?? {};
@@ -355,8 +355,8 @@
       protocol: input.protocol || 'chat-completions',
       model: input.provider === 'relay' ? String(input.model || '').trim() : '',
       timeoutMs: integer(input.timeoutMs, 25000, 5000, 120000),
-      batchSize: integer(input.batchSize, 30, 1, 50),
-      concurrency: integer(input.concurrency, 2, 1, 2),
+      batchSize: input.provider === 'local' ? 1 : integer(input.batchSize, 30, 1, 50),
+      concurrency: input.provider === 'local' ? 1 : integer(input.concurrency, 2, 1, 2),
       maxChars: integer(input.maxChars, 3000, 500, 12000),
       translationMode: input.provider === 'relay' ? (input.translationMode || 'batch') : 'batch',
       glossary: Object.fromEntries(Object.entries(glossary).sort(([a], [b]) => a.localeCompare(b))),
@@ -513,6 +513,111 @@
   }
   self.CRSubFix = self.CRSubFix || {};
   self.CRSubFix.relay = { DEFAULTS, LANGUAGES, DIALOGUE_RULES, targetRules, config, baseUrl, host, originPattern, validateTexts, annotate, body, extract, parse, translate };
+})();
+
+;
+// lib/local-translator.js
+(function () {
+  'use strict';
+  const NS = self.CRSubFix = self.CRSubFix || {};
+  const PORT = 'MT_LOCAL_ENGINE';
+  function language(value) {
+    if (!/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(value || '')) throw new Error('LOCAL_LANGUAGE');
+    if (/^zh/i.test(value)) return /Hant|TW|HK/i.test(value) ? 'zh-Hant' : 'zh';
+    return value.split('-')[0];
+  }
+  const pair = (source, target) => `${language(source)}:${language(target)}`;
+  function engine(api) {
+    let session = null, current = '', controller = null, generation = 0;
+    function stop() {
+      generation++;
+      controller?.abort(); controller = null;
+      session?.destroy(); session = null; current = '';
+    }
+    async function prepare(source, target, progress = () => {}) {
+      stop();
+      if (!api) throw new Error('LOCAL_UNSUPPORTED');
+      const id = generation;
+      const options = { sourceLanguage: language(source), targetLanguage: language(target) };
+      controller = new AbortController();
+      // create() must start in the user's click gesture, before awaiting anything.
+      const task = api.create({ ...options, signal: controller.signal,
+        monitor(monitor) { monitor.addEventListener('downloadprogress', event => {
+          if (id === generation) progress(Math.max(0, Math.min(1, event.total ? event.loaded / event.total : event.loaded)));
+        }); } });
+      try {
+        const result = await task;
+        if (id !== generation) { result.destroy(); throw new Error('LOCAL_CANCELLED'); }
+        session = result; current = pair(source, target);
+      } catch (error) {
+        if (id !== generation || error.name === 'AbortError') throw new Error('LOCAL_CANCELLED');
+        throw new Error(error.name === 'NotSupportedError' ? 'LOCAL_UNAVAILABLE' : 'LOCAL_DOWNLOAD_FAILED');
+      }
+    }
+    async function translate(source, target, texts, signal) {
+      if (!session) throw new Error('LOCAL_NOT_READY');
+      if (current !== pair(source, target)) throw new Error('LOCAL_LANGUAGE');
+      const result = [];
+      for (const text of texts) {
+        const translated = await session.translate(text, { signal });
+        if (typeof translated !== 'string' || !translated.trim() || translated.length > 16000) throw new Error('LOCAL_INVALID_OUTPUT');
+        result.push(translated);
+      }
+      return result;
+    }
+    return { prepare, translate, stop, get pair() { return current; } };
+  }
+  function broker(runtime) {
+    let port = null, current = '';
+    const pending = new Map();
+    function attach(candidate) {
+      if (candidate.name !== PORT) return false;
+      if (candidate.sender?.id !== runtime.id || candidate.sender?.url?.split(/[?#]/)[0] !== runtime.getURL('translation.html')) {
+        candidate.disconnect(); return true;
+      }
+      // Only one explicitly prepared settings page owns the local engine.
+      candidate.onMessage.addListener(message => {
+        if (message?.type === 'ready' && typeof message.pair === 'string' && /^[a-z-]+:[a-z-]+$/i.test(message.pair)) {
+          if (port && port !== candidate) {
+            for (const job of [...pending.values()]) job.reject(new Error('LOCAL_NOT_READY'));
+            try { port.postMessage({ type: 'replaced' }); } catch (_) {}
+          }
+          port = candidate; current = message.pair; return;
+        }
+        if (candidate !== port || message?.type !== 'result') return;
+        const job = pending.get(message.id);
+        if (!job) return;
+        if (message.error) job.reject(new Error(/^LOCAL_[A-Z_]+$/.test(message.error) ? message.error : 'LOCAL_FAILED'));
+        else if (!Array.isArray(message.translations) || message.translations.length !== job.count ||
+          message.translations.some(text => typeof text !== 'string' || !text.trim() || text.length > 16000)) job.reject(new Error('LOCAL_INVALID_OUTPUT'));
+        else job.resolve(message.translations);
+      });
+      candidate.onDisconnect.addListener(() => {
+        if (port !== candidate) return;
+        port = null; current = '';
+        for (const job of [...pending.values()]) job.reject(new Error('LOCAL_NOT_READY'));
+      });
+      return true;
+    }
+    function translate(texts, source, target, timeoutMs) {
+      if (!port) return Promise.reject(new Error('LOCAL_NOT_READY'));
+      if (current !== pair(source, target)) return Promise.reject(new Error('LOCAL_LANGUAGE'));
+      if (pending.size) return Promise.reject(new Error('BUSY'));
+      const id = crypto.randomUUID(), owner = port;
+      return new Promise((resolve, reject) => {
+        const settle = fn => value => { clearTimeout(timer); pending.delete(id); fn(value); };
+        const timer = setTimeout(() => {
+          try { owner.postMessage({ type: 'cancel', id }); } catch (_) {}
+          pending.get(id)?.reject(new Error('LOCAL_TIMEOUT'));
+        }, timeoutMs);
+        pending.set(id, { count: texts.length, resolve: settle(resolve), reject: settle(reject) });
+        try { owner.postMessage({ type: 'translate', id, texts, source, target }); }
+        catch (_) { pending.get(id).reject(new Error('LOCAL_NOT_READY')); }
+      });
+    }
+    return { attach, translate };
+  }
+  NS.localTranslator = { PORT, language, pair, engine, broker };
 })();
 
 ;
@@ -3381,6 +3486,7 @@
 const { MSG } = self.CRSubFix.protocol;
 const SETTINGS = self.CRSubFix.settings;
 const RELAY = self.CRSubFix.relay;
+const LOCAL = self.CRSubFix.localTranslator.broker(chrome.runtime);
 const WORK = self.CRSubFix.workProfiles;
 const LOOKUP = self.CRSubFix.workLookup;
 const REVIEW = self.CRSubFix.translationReview;
@@ -3440,13 +3546,13 @@ function contentSender(sender) {
 }
 async function readState() {
   await ready;
-  return chrome.storage.local.get({ ...SETTINGS.defaults(), relayConfig: null, mtApiKey: '', mtWorkProfiles: null });
+  return chrome.storage.local.get({ ...SETTINGS.defaults(), relayConfig: null, mtApiKey: '', mtWorkProfiles: null, mtCloudConfig: null });
 }
 function selectedConfig(s) {
   return RELAY.config(s.relayConfig || RELAY.DEFAULTS);
 }
 function isConfigured(s) {
-  try { selectedConfig(s); return !!s.mtApiKey; } catch (_) { return false; }
+  try { return selectedConfig(s).provider === 'local' || !!s.mtApiKey; } catch (_) { return false; }
 }
 function publicState(s) {
   const settings = {};
@@ -3470,8 +3576,9 @@ async function getConfig() {
   const s = await readState();
   const cfg = s.relayConfig || { ...RELAY.DEFAULTS };
   let authorized = false;
-  if (isConfigured(s)) authorized = await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] });
-  return { ok: true, config: cfg, hasKey: !!s.mtApiKey, authorized,
+  if (cfg.provider === 'local') authorized = true;
+  else if (isConfigured(s)) authorized = await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] });
+  return { ok: true, config: cfg, cloudConfig: s.mtCloudConfig, hasKey: !!s.mtApiKey, authorized,
     enabled: s.mtEnabled, target: s.mtTarget, source: s.mtSource, workEnabled: s.mtWorkEnabled };
 }
 async function assistConfig() {
@@ -3539,21 +3646,22 @@ async function saveConfig(payload) {
   const s = await readState();
   const newKey = typeof payload.apiKey === 'string' ? payload.apiKey.trim() : '';
   if (newKey.length > 4096 || /\s/.test(newKey)) throw new Error('INVALID_KEY');
-  const old = s.relayConfig;
+  const local = cfg.provider === 'local';
+  const old = s.relayConfig?.provider === 'local' ? s.mtCloudConfig : s.relayConfig;
   // A key saved for one destination must never silently follow a changed host/provider.
-  const sameDestination = old && old.provider === cfg.provider &&
+  const sameDestination = !local && old && old.provider === cfg.provider &&
     (cfg.provider === 'deepl' || new URL(old.baseUrl).origin === new URL(cfg.baseUrl).origin);
-  const key = newKey || (sameDestination ? s.mtApiKey : '');
-  if (!key) throw new Error('KEY_REQUIRED');
-  if (!await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, key))] })) {
+  const key = local ? s.mtApiKey : newKey || (sameDestination ? s.mtApiKey : '');
+  if (!local && !key) throw new Error('KEY_REQUIRED');
+  if (!local && !await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, key))] })) {
     throw new Error('HOST_PERMISSION_REQUIRED');
   }
   const identity = value => JSON.stringify([
     ...['provider', 'baseUrl', 'protocol', 'model'].map(k => value?.[k]), value?.glossary || {},
   ]);
-  const changed = identity(old) !== identity(cfg) || !!newKey;
+  const changed = identity(s.relayConfig) !== identity(cfg) || (!local && !!newKey);
   await chrome.storage.local.set({
-    relayConfig: cfg, mtApiKey: key, mtProvider: cfg.provider, mtEnabled: payload.enabled === true,
+    relayConfig: cfg, mtCloudConfig: local ? old : cfg, mtApiKey: key, mtProvider: cfg.provider, mtEnabled: payload.enabled === true,
     mtTarget: payload.target, mtSource: payload.source, mtBatchSize: cfg.batchSize, mtMaxChars: cfg.maxChars,
     mtConcurrency: cfg.concurrency, mtTimeoutMs: cfg.timeoutMs,
     mtTranslationMode: cfg.translationMode,
@@ -3834,7 +3942,7 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
   const keepAlive = setInterval(() => chrome.runtime.getPlatformInfo().catch(() => {}), 20000);
   try {
     if (!test && (!s.mtEnabled || !s.enabled)) throw new Error('TRANSLATION_DISABLED');
-    if (!s.mtApiKey) throw new Error('KEY_REQUIRED');
+    if (cfg.provider !== 'local' && !s.mtApiKey) throw new Error('KEY_REQUIRED');
     if (!test && payload?.configTag !== s.mtConfigTag) throw new Error('CONFIG_CHANGED');
     if (!test && payload?.provider !== cfg.provider) throw new Error('CONFIG_CHANGED');
     let record = null;
@@ -3867,14 +3975,16 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
       }
     } else RELAY.validateTexts(texts, cfg);
     if (!RELAY.LANGUAGES[target]) throw new Error('INVALID_TARGET');
-    if (!await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] })) {
+    if (cfg.provider !== 'local' && !await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] })) {
       throw new Error('HOST_PERMISSION_REQUIRED');
     }
     // Parallel batches must not read and overwrite the same budget snapshot.
-    const reservation = budgetWrite.then(() => reserveBudget(tabId,
-      (streaming ? items.map(i => i.text) : texts).reduce((n, t) => n + t.length, 0)));
-    budgetWrite = reservation.catch(() => {});
-    await reservation;
+    if (cfg.provider !== 'local') {
+      const reservation = budgetWrite.then(() => reserveBudget(tabId,
+        (streaming ? items.map(i => i.text) : texts).reduce((n, t) => n + t.length, 0)));
+      budgetWrite = reservation.catch(() => {});
+      await reservation;
+    }
     if (!test) await recordRequest(payload, cfg, record, s.mtWorkEnabled, sender, streaming);
     let translations;
     if (streaming) {
@@ -3897,7 +4007,9 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
         stream.onItem(index, text);
       }, { signal: stream?.signal, cleanText: self.CRSubFix.mtUtils.plainText,
         onIssue: issue => stream?.onIssue?.(issue) });
-    } else translations = await RELAY.translate(cfg, s.mtApiKey, texts, source, target);
+    } else translations = cfg.provider === 'local'
+      ? await LOCAL.translate(texts, source, target, cfg.timeoutMs)
+      : await RELAY.translate(cfg, s.mtApiKey, texts, source, target);
     const latest = await readState();
     if (latest.mtConfigTag !== s.mtConfigTag || (!test && !latest.mtEnabled)) throw new Error('CONFIG_CHANGED');
     if (!test) await workFor(latest, payload, sender);
@@ -3910,6 +4022,7 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
 }
 
 chrome.runtime.onConnect.addListener(port => {
+  if (LOCAL.attach(port)) return;
   if (port.name !== MSG.MT_STREAM) return;
   const sender = port.sender;
   if (!contentSender(sender) || !/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?watch\/[^/]+(?:\/|$)/i.test(new URL(sender.url).pathname)) { port.disconnect(); return; }

@@ -55,17 +55,17 @@
 
     /* ── Hero ── */
     .hero { text-align: center; margin-bottom: 26px; }
-    .hero h1 { font-size: 30px; letter-spacing: -0.01em; }
+    .hero h1 { font-size: 30px; letter-spacing: 0; }
     .hero h1 .accent { color: var(--accent); }
     .hero .tagline { color: var(--text-dim); font-size: 15px; margin-top: 6px; }
 
     /* ── Sticky section nav ── */
     nav {
-      position: sticky; top: 0; z-index: 10;
+      position: relative; z-index: 10;
       background: rgba(26,26,46,0.88); backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border);
       margin: 0 -20px 34px; padding: 10px 20px;
-      display: flex; gap: 6px; overflow-x: auto; justify-content: safe center;
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: safe center;
       scrollbar-width: none;
     }
     nav::-webkit-scrollbar { display: none; }
@@ -80,9 +80,8 @@
     /* ── Sections ── */
     section {
       margin-bottom: 30px; scroll-margin-top: 64px;
-      background: rgba(22,33,62,0.35);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 26px 26px 20px;
+      border-bottom: 1px solid var(--border);
+      padding: 26px 0 20px;
     }
     h2 { font-size: 19px; margin-bottom: 8px; display: flex; align-items: baseline; gap: 11px; }
     h2 .num {
@@ -92,6 +91,9 @@
     }
     p  { color: var(--text-2); font-size: 14px; margin-bottom: 10px; }
     p.dim { color: var(--text-dim); font-size: 13px; }
+    section a { color: var(--link); }
+    .quick-start ol { padding-left: 24px; color: var(--text-2); font-size: 14px; }
+    .quick-start li { margin-bottom: 10px; }
     kbd {
       background: var(--panel-2); border: 1px solid var(--border-2);
       border-bottom-width: 2px; border-radius: 4px;
@@ -375,8 +377,18 @@
 <main>
   <div class="hero">
     <h1>How <span class="accent">Better Subs</span> works</h1>
-    <p class="tagline">From the basics to the power features — each section builds on the one before it.</p>
+    <p class="tagline">新版增加了多源字幕搜索、同合集下一集跟随、自选翻译接口、流式边译边看、多语言搜索名、可选 AI 分析和校对导出。</p>
   </div>
+
+  <section class="quick-start" id="quick-start">
+    <h2>当前版本快速入门</h2>
+    <p>先在 Crunchyroll 打开一集，等待字幕菜单出现。播放器字幕按钮旁的 ▾ 是选择字幕、外部字幕和作品资料的入口；浏览器工具栏弹窗用于界面语言、字幕样式和翻译设置。</p>
+    <ol>
+      <li>有想要的官方字幕：直接选择语言，也可以搭配第二字幕进行双语观看。</li>
+      <li>没有合适的官方字幕：先到「外部字幕」搜索；仍找不到时，再手动启动机器翻译。</li>
+    </ol>
+    <p><a href="#custom">外部字幕与合集跟随</a> · <a href="#translation-guide">机器翻译与边译边看</a> · <a href="#work-guide">作品资料与校对导出</a></p>
+  </section>
 
   <nav>
     <a href="#big-picture"><b>1</b>Big picture</a>
@@ -386,7 +398,10 @@
     <a href="#hide"><b>5</b>Hiding CR's subs</a>
     <a href="#dual"><b>6</b>Dual &amp; learning</a>
     <a href="#sync"><b>7</b>Sync</a>
-    <a href="#custom"><b>8</b>Custom &amp; MT</a>
+    <a href="#custom"><b>8</b>外部字幕与合集跟随</a>
+    <a href="#translation-guide"><b>9</b>机器翻译与边译边看</a>
+    <a href="#work-guide"><b>10</b>作品资料与校对导出</a>
+    <a href="#troubleshooting"><b>11</b>遇到问题时</a>
   </nav>
 
   <!-- ── 1. Big picture ── -->
@@ -666,29 +681,35 @@
 
   <!-- ── 8. Custom sources & machine translation ── -->
   <section id="custom">
-    <h2><span class="num">8</span> Your own subtitles &amp; machine translation</h2>
-    <p>Beyond Crunchyroll's catalog, two more ways to get a subtitle track:</p>
-    <div class="diagram">
-      <div class="lane-label">Load a file — fansubs welcome</div>
-      <div class="flow">
-        <div class="node">.ass / .ssa / .srt / .vtt<small>▾ → Load subtitle file</small></div>
-        <div class="arrow">→</div>
-        <div class="node">Auto-sync<small>anchored to the episode</small></div>
-        <div class="arrow">→</div>
-        <div class="node ok">Own track<small>fonts &amp; signs included</small></div>
-      </div>
-      <div class="lane-label" style="margin-top:18px;">Machine translation — languages CR doesn't have</div>
-      <div class="flow">
-        <div class="node">Pick a source<small>any catalog language</small></div>
-        <div class="arrow">→</div>
-        <div class="node mt">Translated<small>DeepL — your own API key</small></div>
-        <div class="arrow">→</div>
-        <div class="node ok">New track<small>e.g. Japanese subs on a dub</small></div>
-      </div>
-    </div>
-    <p class="dim">Both become regular tracks in the ▾ menu — restyle them, use them as either
-       band of a dual-subtitle pair, or export them as .srt. Translations are cached per episode
-       so they aren't re-billed on rewatch.</p>
+    <h2><span class="num">8</span>外部字幕与合集跟随</h2>
+    <p>1. 从当前播放页打开「外部字幕」，配置要使用的字幕源 Key。assrt 适合找中文字幕，Jimaku 以日文为主，SubDL 提供多语言候选；各来源的覆盖和可用性不同。</p>
+    <p>2. 核对作品、季和集数，选择搜索名。优先参考可获取的官方多语言名，也可离线简繁转换；结果少时换英文名或日文名再搜。AI 名称分析是可选的，需要支持分析的模型接口，DeepL 用户可以跳过。</p>
+    <p>3. 按「目录 → 发布版本 → 当前集文件」选择，先预览再加载。相同集数可能属于不同字幕组、WEB／BD 或修订版，不要只看集数。也可以导入本地字幕文件。</p>
+    <p>4. 要连续观看同一套字幕，勾选「跟随此字幕合集」后再「加载到播放器」。下一集会尝试匹配已确认的作品、季和发布版本，并继承该合集的延迟；缺集、特别篇或匹配不明确时需手动选择。</p>
+    <p>字幕提前或落后时，以对白为准微调延迟，每次可调 0.1 秒。BD 与 WEB 的剪辑可能不同；如果前面同步、后面仍错位，单一延迟无法解决，优先换更接近当前片源的版本。</p>
+    <p>字幕服务由 assrt.net 提供（使用该来源时）。</p>
+  </section>
+  <section id="translation-guide">
+    <h2><span class="num">9</span>机器翻译与边译边看</h2>
+    <p><b>Browser local translation (no key)</b></p>
+    <p>Local translation is experimental. Short dialogue and idioms can be mistranslated.</p>
+    <p>Download a language model once, then translate on this device. Keep this settings tab open while translating. Work context and AI analysis are not used by this engine.</p>
+    <p>Save settings, then prepare the selected language pair.</p>
+    <p>1. 选择 DeepL 或自选 OpenAI 兼容接口。自选接口需填写 Base URL、Key、模型和服务支持的协议；这些服务与额度由你自行提供。</p>
+    <p>2. 回到当前集的字幕菜单，选择源字幕和目标语言，再启动翻译。支持流式的接口可开启流式输出：已完成的字幕先显示，不必等整集完成；跳到尚未译完的位置仍需等待。</p>
+    <p>3. 可以暂停、继续或在失败后重试未完成部分。先从每批 15 条、并发 1、超时 60 秒试起，再逐步增加；频繁超时或限流时降低批量和并发。缓存仍在且设置匹配时可复用进度，清缓存或更换配置后可能需要重新翻译。</p>
+    <p>翻译会将字幕发送到你选择的服务，可能产生费用。找不到外部字幕不会自动触发付费机翻；界面语言也不会改变翻译目标语言。</p>
+    <p><a href="translation.html">打开翻译设置</a></p>
+  </section>
+  <section id="work-guide">
+    <h2><span class="num">10</span>作品资料与校对导出</h2>
+    <p>翻译前可从播放器菜单打开「作品资料」，核对识别的作品，查询并确认资料，整理角色名和术语后保存。资料用于辅助模型理解，不保证消除误译；AI 整理需要支持分析的接口，不能用 DeepL 代替。</p>
+    <p>从字幕菜单的导出功能保存字幕或校对 CSV，可对照原文、人工字幕和机翻结果。官方没有中文字幕时，不影响外部字幕搜索或机翻，也不必先准备中文参考。</p>
+  </section>
+  <section id="troubleshooting">
+    <h2><span class="num">11</span>遇到问题时</h2>
+    <p>搜不到：核对作品和季，换语言名称或字幕源。下载失败：重新获取详情、换候选，或下载后本地导入。下一集没跟随：检查是否勾选跟随并加载过，以及该发布版本是否有对应集。</p>
+    <p>更新时将完整安装包覆盖到原加载目录，再重新加载扩展并刷新播放页。不要删除扩展，以免丢失本地设置；更新后仍有后台加载错误时，完全退出浏览器再重开。</p>
   </section>
 
   <footer>
@@ -698,5 +719,7 @@
   <script src="lib/settings-schema.js"></script>
   <script src="lib/i18n.js"></script>
   <script src="lib/i18n-player.js"></script>
+  <script src="lib/i18n-help.js"></script>
+  <script src="lib/i18n-local.js"></script>
 </body>
 </html>

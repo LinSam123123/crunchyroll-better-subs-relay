@@ -62,10 +62,10 @@ export function background({ data = {}, fetcher, secure = true, allowed = true }
       if (!handled) reject(new Error('Unhandled message'));
     });
   }
-  function connect(sender = content) {
+  function connect(sender = content, name = 'MT_STREAM') {
     const handlers = [], disconnects = [], messages = [];
     let closed = false;
-    const port = { name: 'MT_STREAM', sender,
+    const port = { name, sender,
       onMessage: { addListener: f => handlers.push(f) }, onDisconnect: { addListener: f => disconnects.push(f) },
       postMessage: msg => messages.push(json(msg)),
       disconnect: () => { closed = true; disconnects.forEach(f => f()); },

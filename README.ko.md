@@ -1,10 +1,19 @@
 # Crunchyroll Better Subs Relay
 
+로컬 번역(실험 기능): 번역 설정에서 Browser local translation (no key)을 선택하고 원문과 번역 언어를 저장한 다음 Prepare local translation을 누르세요. 처음에는 브라우저 언어 모델을 다운로드합니다. 설정 탭을 열어 둔 채 플레이어로 돌아가 번역하세요. 완료된 자막부터 표시하며 일시 정지와 이어 번역을 지원합니다. 원문 자동 선택은 영어를 준비하므로 다른 언어는 해당 언어 쌍을 다시 준비해야 합니다. 브라우저·기기·언어 쌍에 따라 지원 여부가 다릅니다. 유료 서비스로 자동 전환하지 않으며 작품 정보나 용어 지시는 사용하지 않습니다. 기존 클라우드 설정과 키는 유지됩니다.
+
 [中文](README.md) · [English](README.en.md) · [日本語](README.ja.md) · [AI 에이전트 안내](AGENTS.md) · [Beta 다운로드](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases)
 
 Crunchyroll용 비공식 자막 확장 프로그램입니다. 공식 자막을 선택하거나 외부 자막을 찾을 수 있으며, 적절한 자막이 없으면 본인의 번역 API로 번역할 수 있습니다. 현재는 **체험용 Beta 버전**입니다. 의견과 오류 제보를 환영하지만, 공개 이슈에 API 키나 자막 전체를 올리지 마세요.
 
 [Better Subs for Crunchyroll](https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll)을 기반으로 개선했습니다. 원작자 anitastic-pixel에게 감사드립니다. Crunchyroll이나 원작자가 공식 배포하는 버전은 아닙니다.
+
+## 2.7.0.33 변경 사항
+
+- API 키 없이 사용하는 실험적 브라우저 로컬 번역을 추가했습니다. 처음 모델을 다운로드하고 번역 설정 탭을 열어 두세요.
+- 도구 모음 팝업의 좁은 너비를 수정하고 다국어 사용 안내를 보완했습니다.
+- 짧은 대사와 관용구를 잘못 번역할 수 있습니다. 기본으로 활성화되지 않으며 유료 서비스로 자동 전환하지 않습니다.
+- 로컬 번역은 클라우드 번역 서비스에 자막을 보내지 않습니다. 최초 모델 다운로드에는 인터넷이 필요합니다.
 
 ## 주요 기능
 

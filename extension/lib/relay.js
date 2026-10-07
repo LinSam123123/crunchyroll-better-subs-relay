@@ -29,7 +29,7 @@
     return n;
   }
   function config(input) {
-    if (!input || !['relay', 'deepl'].includes(input.provider)) fail('INVALID_PROVIDER');
+    if (!input || !['relay', 'deepl', 'local'].includes(input.provider)) fail('INVALID_PROVIDER');
     if (input.protocol && !['chat-completions', 'responses'].includes(input.protocol)) fail('INVALID_PROTOCOL');
     if (input.translationMode && !['batch', 'episode-stream'].includes(input.translationMode)) fail('INVALID_MODE');
     const glossary = input.glossary ?? {};
@@ -43,8 +43,8 @@
       protocol: input.protocol || 'chat-completions',
       model: input.provider === 'relay' ? String(input.model || '').trim() : '',
       timeoutMs: integer(input.timeoutMs, 25000, 5000, 120000),
-      batchSize: integer(input.batchSize, 30, 1, 50),
-      concurrency: integer(input.concurrency, 2, 1, 2),
+      batchSize: input.provider === 'local' ? 1 : integer(input.batchSize, 30, 1, 50),
+      concurrency: input.provider === 'local' ? 1 : integer(input.concurrency, 2, 1, 2),
       maxChars: integer(input.maxChars, 3000, 500, 12000),
       translationMode: input.provider === 'relay' ? (input.translationMode || 'batch') : 'batch',
       glossary: Object.fromEntries(Object.entries(glossary).sort(([a], [b]) => a.localeCompare(b))),

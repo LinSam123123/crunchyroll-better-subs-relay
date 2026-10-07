@@ -28,7 +28,15 @@
         <section>
           <div class="section-heading"><h2>翻译接口</h2><label class="check"><input id="enabled" type="checkbox">启用翻译</label></div>
           <label for="provider">服务类型</label>
-          <select id="provider"><option value="relay">自选中转 API</option><option value="deepl">DeepL API</option></select>
+          <select id="provider"><option value="local">Browser local translation (no key)</option><option value="relay">自选中转 API</option><option value="deepl">DeepL API</option></select>
+          <div id="localFields" hidden>
+            <p>Local translation is experimental. Short dialogue and idioms can be mistranslated.</p>
+            <p>Download a language model once, then translate on this device. Keep this settings tab open while translating. Work context and AI analysis are not used by this engine.</p>
+            <button id="localPrepare" type="button" disabled>Prepare local translation</button>
+            <button id="localStop" type="button" disabled>Stop local engine</button>
+            <progress id="localProgress" max="1" value="0" hidden></progress>
+            <p id="localStatus" role="status" aria-live="polite" data-i18n-ignore></p>
+          </div>
           <fieldset id="relayFields">
             <label for="baseUrl">Base URL</label>
             <input id="baseUrl" type="url" placeholder="https://your-provider.example/v1" translate="no" data-i18n-ignore spellcheck="false" autocomplete="off" required>
@@ -37,7 +45,7 @@
               <div><label for="model">模型 ID</label><input id="model" placeholder="模型名称" spellcheck="false" maxlength="200" required></div>
             </div>
           </fieldset>
-          <label for="apiKey">API Key <span id="keyState" data-i18n-ignore></span></label>
+          <label id="keyLabel" for="apiKey">API Key <span id="keyState" data-i18n-ignore></span></label>
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" maxlength="4096" data-i18n-ignore placeholder="输入密钥">
         </section>
         <section>
@@ -46,12 +54,14 @@
             <div><label for="source">默认原文</label><select id="source" data-i18n-ignore></select></div>
             <div><label for="target">默认译文</label><select id="target" data-i18n-ignore></select></div>
           </div>
+          <div id="cloudTranslationFields">
           <label for="translationMode">翻译模式</label>
           <select id="translationMode"><option value="batch">分批翻译</option><option value="episode-stream">整集流式（实验）</option></select>
           <label for="glossary">术语表（JSON，可选）</label>
           <textarea id="glossary" rows="4" spellcheck="false" maxlength="12000" translate="no" data-i18n-ignore placeholder='{"Roxy":"洛琪希","Eris":"艾莉丝","Man-God":"人神"}'></textarea>
           <label class="check work-toggle"><input id="workEnabled" type="checkbox">作品资料辅助翻译</label>
           <a href="work.html">已确认的作品资料</a>
+          </div>
         </section>
         <section>
           <h2>请求限制</h2>
@@ -71,12 +81,15 @@
       <p id="status" role="status" aria-live="polite" data-i18n-ignore>正在读取设置…</p>
       <output id="sample" translate="no" data-i18n-ignore hidden></output>
     </form>
-    <footer>字幕文本仅发送至所选服务。机器翻译可能有误。<br>密钥保存在此浏览器的扩展本地存储中，不同步。</footer>
+    <footer><span id="cloudPrivacy">字幕文本仅发送至所选服务。</span><span id="localPrivacy" hidden>Local translation keeps subtitle text on this device.</span> <span>机器翻译可能有误。</span><br>密钥保存在此浏览器的扩展本地存储中，不同步。</footer>
   </main>
   <script src="lib/protocol.js"></script>
   <script src="lib/relay.js"></script>
   <script src="lib/i18n.js"></script>
   <script src="lib/i18n-translation.js"></script>
+  <script src="lib/i18n-local.js"></script>
+  <script src="lib/local-translator.js"></script>
   <script src="translation.js"></script>
+  <script src="local-translation-ui.js"></script>
 </body>
 </html>

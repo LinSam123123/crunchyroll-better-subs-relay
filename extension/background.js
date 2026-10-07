@@ -1,7 +1,8 @@
-importScripts("lib/protocol.js", "lib/settings-schema.js", "lib/relay.js", "lib/relay-stream.js", "lib/mt-utils.js", "lib/progress-cache.js", "lib/work-lookup.js", "lib/work-profiles.js", "lib/work-organizer.js", "lib/translation-review.js", "lib/subtitle-parser.js", "lib/assrt.js", "lib/fflate.js", "lib/subdl.js", "lib/jimaku.js", "lib/episode-metadata.js", "lib/collection-match.js", "lib/search-names.js", "lib/subtitle-assist.js", "lib/external-cache.js", "lib/external-subs.js");
+importScripts("lib/protocol.js", "lib/settings-schema.js", "lib/relay.js", "lib/local-translator.js", "lib/relay-stream.js", "lib/mt-utils.js", "lib/progress-cache.js", "lib/work-lookup.js", "lib/work-profiles.js", "lib/work-organizer.js", "lib/translation-review.js", "lib/subtitle-parser.js", "lib/assrt.js", "lib/fflate.js", "lib/subdl.js", "lib/jimaku.js", "lib/episode-metadata.js", "lib/collection-match.js", "lib/search-names.js", "lib/subtitle-assist.js", "lib/external-cache.js", "lib/external-subs.js");
 const { MSG } = self.CRSubFix.protocol;
 const SETTINGS = self.CRSubFix.settings;
 const RELAY = self.CRSubFix.relay;
+const LOCAL = self.CRSubFix.localTranslator.broker(chrome.runtime);
 const WORK = self.CRSubFix.workProfiles;
 const LOOKUP = self.CRSubFix.workLookup;
 const REVIEW = self.CRSubFix.translationReview;
@@ -61,13 +62,13 @@ function contentSender(sender) {
 }
 async function readState() {
   await ready;
-  return chrome.storage.local.get({ ...SETTINGS.defaults(), relayConfig: null, mtApiKey: '', mtWorkProfiles: null });
+  return chrome.storage.local.get({ ...SETTINGS.defaults(), relayConfig: null, mtApiKey: '', mtWorkProfiles: null, mtCloudConfig: null });
 }
 function selectedConfig(s) {
   return RELAY.config(s.relayConfig || RELAY.DEFAULTS);
 }
 function isConfigured(s) {
-  try { selectedConfig(s); return !!s.mtApiKey; } catch (_) { return false; }
+  try { return selectedConfig(s).provider === 'local' || !!s.mtApiKey; } catch (_) { return false; }
 }
 function publicState(s) {
   const settings = {};
@@ -91,8 +92,9 @@ async function getConfig() {
   const s = await readState();
   const cfg = s.relayConfig || { ...RELAY.DEFAULTS };
   let authorized = false;
-  if (isConfigured(s)) authorized = await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] });
-  return { ok: true, config: cfg, hasKey: !!s.mtApiKey, authorized,
+  if (cfg.provider === 'local') authorized = true;
+  else if (isConfigured(s)) authorized = await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] });
+  return { ok: true, config: cfg, cloudConfig: s.mtCloudConfig, hasKey: !!s.mtApiKey, authorized,
     enabled: s.mtEnabled, target: s.mtTarget, source: s.mtSource, workEnabled: s.mtWorkEnabled };
 }
 async function assistConfig() {
@@ -160,21 +162,22 @@ async function saveConfig(payload) {
   const s = await readState();
   const newKey = typeof payload.apiKey === 'string' ? payload.apiKey.trim() : '';
   if (newKey.length > 4096 || /\s/.test(newKey)) throw new Error('INVALID_KEY');
-  const old = s.relayConfig;
+  const local = cfg.provider === 'local';
+  const old = s.relayConfig?.provider === 'local' ? s.mtCloudConfig : s.relayConfig;
   // A key saved for one destination must never silently follow a changed host/provider.
-  const sameDestination = old && old.provider === cfg.provider &&
+  const sameDestination = !local && old && old.provider === cfg.provider &&
     (cfg.provider === 'deepl' || new URL(old.baseUrl).origin === new URL(cfg.baseUrl).origin);
-  const key = newKey || (sameDestination ? s.mtApiKey : '');
-  if (!key) throw new Error('KEY_REQUIRED');
-  if (!await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, key))] })) {
+  const key = local ? s.mtApiKey : newKey || (sameDestination ? s.mtApiKey : '');
+  if (!local && !key) throw new Error('KEY_REQUIRED');
+  if (!local && !await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, key))] })) {
     throw new Error('HOST_PERMISSION_REQUIRED');
   }
   const identity = value => JSON.stringify([
     ...['provider', 'baseUrl', 'protocol', 'model'].map(k => value?.[k]), value?.glossary || {},
   ]);
-  const changed = identity(old) !== identity(cfg) || !!newKey;
+  const changed = identity(s.relayConfig) !== identity(cfg) || (!local && !!newKey);
   await chrome.storage.local.set({
-    relayConfig: cfg, mtApiKey: key, mtProvider: cfg.provider, mtEnabled: payload.enabled === true,
+    relayConfig: cfg, mtCloudConfig: local ? old : cfg, mtApiKey: key, mtProvider: cfg.provider, mtEnabled: payload.enabled === true,
     mtTarget: payload.target, mtSource: payload.source, mtBatchSize: cfg.batchSize, mtMaxChars: cfg.maxChars,
     mtConcurrency: cfg.concurrency, mtTimeoutMs: cfg.timeoutMs,
     mtTranslationMode: cfg.translationMode,
@@ -455,7 +458,7 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
   const keepAlive = setInterval(() => chrome.runtime.getPlatformInfo().catch(() => {}), 20000);
   try {
     if (!test && (!s.mtEnabled || !s.enabled)) throw new Error('TRANSLATION_DISABLED');
-    if (!s.mtApiKey) throw new Error('KEY_REQUIRED');
+    if (cfg.provider !== 'local' && !s.mtApiKey) throw new Error('KEY_REQUIRED');
     if (!test && payload?.configTag !== s.mtConfigTag) throw new Error('CONFIG_CHANGED');
     if (!test && payload?.provider !== cfg.provider) throw new Error('CONFIG_CHANGED');
     let record = null;
@@ -488,14 +491,16 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
       }
     } else RELAY.validateTexts(texts, cfg);
     if (!RELAY.LANGUAGES[target]) throw new Error('INVALID_TARGET');
-    if (!await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] })) {
+    if (cfg.provider !== 'local' && !await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] })) {
       throw new Error('HOST_PERMISSION_REQUIRED');
     }
     // Parallel batches must not read and overwrite the same budget snapshot.
-    const reservation = budgetWrite.then(() => reserveBudget(tabId,
-      (streaming ? items.map(i => i.text) : texts).reduce((n, t) => n + t.length, 0)));
-    budgetWrite = reservation.catch(() => {});
-    await reservation;
+    if (cfg.provider !== 'local') {
+      const reservation = budgetWrite.then(() => reserveBudget(tabId,
+        (streaming ? items.map(i => i.text) : texts).reduce((n, t) => n + t.length, 0)));
+      budgetWrite = reservation.catch(() => {});
+      await reservation;
+    }
     if (!test) await recordRequest(payload, cfg, record, s.mtWorkEnabled, sender, streaming);
     let translations;
     if (streaming) {
@@ -518,7 +523,9 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
         stream.onItem(index, text);
       }, { signal: stream?.signal, cleanText: self.CRSubFix.mtUtils.plainText,
         onIssue: issue => stream?.onIssue?.(issue) });
-    } else translations = await RELAY.translate(cfg, s.mtApiKey, texts, source, target);
+    } else translations = cfg.provider === 'local'
+      ? await LOCAL.translate(texts, source, target, cfg.timeoutMs)
+      : await RELAY.translate(cfg, s.mtApiKey, texts, source, target);
     const latest = await readState();
     if (latest.mtConfigTag !== s.mtConfigTag || (!test && !latest.mtEnabled)) throw new Error('CONFIG_CHANGED');
     if (!test) await workFor(latest, payload, sender);
@@ -531,6 +538,7 @@ async function handleTranslate(payload, sender, test = false, stream = null) {
 }
 
 chrome.runtime.onConnect.addListener(port => {
+  if (LOCAL.attach(port)) return;
   if (port.name !== MSG.MT_STREAM) return;
   const sender = port.sender;
   if (!contentSender(sender) || !/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?watch\/[^/]+(?:\/|$)/i.test(new URL(sender.url).pathname)) { port.disconnect(); return; }

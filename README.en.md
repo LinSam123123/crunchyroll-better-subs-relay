@@ -1,10 +1,18 @@
 # Crunchyroll Better Subs Relay
 
+Experimental local translation: choose Browser local translation (no key) in translation settings, select source and target languages, save, then click Prepare local translation. The browser downloads its model on first use. Keep this settings tab open and return to the player to translate. Completed cues appear progressively; pause and resume are supported. Automatic source selection prepares English; prepare another pair for other source languages. Availability depends on the browser, device and language pair. No automatic paid fallback or work-context/glossary prompting is used. Existing cloud settings and keys are retained.
+
 [中文](README.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Agent guide](AGENTS.md) · [Download Beta](https://github.com/LinSam123123/crunchyroll-better-subs-relay/releases)
 
 An unofficial Crunchyroll subtitle extension for choosing official tracks, finding external subtitles, and translating with your own API when no suitable subtitles are available. This is a **Beta preview**. Feedback is welcome, but never post API keys or complete subtitle files in public issues.
 
 Based on [Better Subs for Crunchyroll](https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll), with thanks to its creator, anitastic-pixel. This fork is not an official release from Crunchyroll or the upstream author.
+
+## New in 2.7.0.33
+
+- Experimental browser-local translation without an API key. Download the model on first use and keep the translation settings tab open.
+- Fixed the narrow toolbar popup and refreshed the multilingual feature guide.
+- Local translation is a free reading aid: short dialogue and idioms can be mistranslated. It is not enabled by default and never automatically falls back to a paid service.
 
 ## Features
 
@@ -52,7 +60,7 @@ Adjust timing in 100ms steps when needed. BD, Netflix, AT-X, and Crunchyroll rel
 ## Keys and Privacy
 
 - No usable keys are included in the repository or download. Use your own accounts. Keys are stored locally by the browser extension; this is **not an encrypted vault**.
-- Translation sends subtitle text to your selected DeepL or compatible provider. AI analysis sends the relevant work information or filenames to your configured analysis service.
+- Cloud translation sends subtitle text to your selected DeepL or compatible provider. Local translation does not send subtitles to those services; the initial model download requires internet access. AI analysis sends the relevant work information or filenames to your configured analysis service.
 - Subtitle searches send keywords to the selected service; downloads contact its file server. Work information queries contact Bangumi, and official regional title queries contact Crunchyroll. Chinese script conversion is offline.
 - Opening a page, changing episodes, or failing to find subtitles does not automatically start paid translation or AI analysis. Check each provider's prices and privacy terms.
 - Access to service domains is requested as needed. Do not give real keys to unknown providers. Redact keys, account information, and temporary download links before sharing screenshots.
