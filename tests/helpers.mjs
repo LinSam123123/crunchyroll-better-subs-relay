@@ -20,6 +20,7 @@ export function background({ data = {}, fetcher, secure = true, allowed = true }
   const listeners = [], connections = [];
   const local = { ...data }, session = {}, calls = [], accesses = [];
   let allowedValue = allowed;
+  let pageUrl = 'https://www.crunchyroll.com/watch/ABC/title';
   const event = () => ({ addListener() {} });
   function storage(values, name) {
     return {
@@ -47,7 +48,8 @@ export function background({ data = {}, fetcher, secure = true, allowed = true }
       runtime: { id: 'test-extension', getPlatformInfo: async () => ({}), getURL: p => `chrome-extension://test-extension/${p}`,
         onMessage: { addListener: f => listeners.push(f) }, onConnect: { addListener: f => connections.push(f) } },
       storage: { local: storage(local, 'local'), session: storage(session, 'session'), onChanged: event() },
-      tabs: { query: async () => [], sendMessage: async () => {}, onRemoved: event() },
+      tabs: { query: async () => [], sendMessage: async (_tab, message) => message.type === 'WORK_PAGE_CHECK'
+        ? { url: pageUrl, guid: ctx.CRSubFix.workProfiles.route(pageUrl, 'watch') } : undefined, onRemoved: event() },
       permissions: { contains: async () => allowedValue, onRemoved: event() },
       commands: { onCommand: event() },
       action: { setBadgeText: async () => {} },
@@ -57,12 +59,14 @@ export function background({ data = {}, fetcher, secure = true, allowed = true }
   const popup = { id: 'test-extension', url: 'chrome-extension://test-extension/translation.html' };
   const content = { id: 'test-extension', url: 'https://www.crunchyroll.com/watch/ABC/title', frameId: 0, tab: { id: 1 } };
   async function send(type, payload, sender = popup) {
+    if (sender.tab) pageUrl = sender.url;
     return new Promise((resolve, reject) => {
       const handled = listeners.some(fn => fn({ type, payload }, sender, v => resolve(json(v))));
       if (!handled) reject(new Error('Unhandled message'));
     });
   }
   function connect(sender = content, name = 'MT_STREAM') {
+    pageUrl = sender.url;
     const handlers = [], disconnects = [], messages = [];
     let closed = false;
     const port = { name, sender,

@@ -210,16 +210,25 @@ async function reserveBudget(tabId, chars) {
   await chrome.storage.session.set({ [key]: { ...budget, chars: budget.chars + chars, requests: budget.requests + 1 } });
 }
 function episodeGuid(sender) { return WORK.route(sender.url, 'watch'); }
-async function currentExternalSender(sender, payload) {
+async function currentPlaybackSender(sender, expectedGuids = [], error = 'SENDER_NOT_ALLOWED') {
+  if (!contentSender(sender)) throw new Error(error);
   let current;
   try {
+    const target = { frameId: 0 };
+    if (sender.documentId) target.documentId = sender.documentId;
     current = await self.CRSubFix.mtUtils.withTimeout(chrome.tabs.sendMessage(sender.tab.id,
-      { type: MSG.WORK_PAGE_CHECK }, { frameId: 0 }), 3000, 'EXTERNAL_CONTEXT_EXPIRED');
+      { type: MSG.WORK_PAGE_CHECK }, target), 3000, error);
   } catch (_) {}
   // MessageSender.url is the original document URL on a history-based SPA hop.
+  // Ask our isolated script in that document; never authorize a page-supplied URL.
   const guid = WORK.route(current?.url, 'watch');
-  if (!guid || guid !== current?.guid || guid !== payload?.guid) throw new Error('EXTERNAL_CONTEXT_EXPIRED');
+  if (!guid || guid !== current?.guid || expectedGuids.some(value => value !== undefined && value !== guid)) {
+    throw new Error(error);
+  }
   return { ...sender, url: current.url };
+}
+function currentExternalSender(sender, payload) {
+  return currentPlaybackSender(sender, [payload?.guid || ''], 'EXTERNAL_CONTEXT_EXPIRED');
 }
 async function workFor(s, payload, sender, check = true) {
   let record = null;
@@ -541,7 +550,7 @@ chrome.runtime.onConnect.addListener(port => {
   if (LOCAL.attach(port)) return;
   if (port.name !== MSG.MT_STREAM) return;
   const sender = port.sender;
-  if (!contentSender(sender) || !/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?watch\/[^/]+(?:\/|$)/i.test(new URL(sender.url).pathname)) { port.disconnect(); return; }
+  if (!contentSender(sender)) { port.disconnect(); return; }
   const controller = new AbortController();
   let started = false, closed = false;
   const post = data => { if (!closed) port.postMessage(data); };
@@ -556,10 +565,13 @@ chrome.runtime.onConnect.addListener(port => {
     }
     if (message?.type !== 'start' || started) return;
     started = true;
-    handleTranslate(message.payload, sender, false, {
-      signal: controller.signal,
-      onItem: (index, text) => post({ type: 'item', index, text }),
-      onIssue: issue => post({ type: 'issue', ...issue }),
+    currentPlaybackSender(sender, [message.payload?.cache?.guid || '']).then(current => {
+      controller.signal.throwIfAborted();
+      return handleTranslate(message.payload, current, false, {
+        signal: controller.signal,
+        onItem: (index, text) => post({ type: 'item', index, text }),
+        onIssue: issue => post({ type: 'issue', ...issue }),
+      });
     }).then(() => post({ type: 'done', ok: true }))
       .catch(error => post({ type: 'done', ok: false, error: safeError(error), details: streamDetails(error.details) }));
   });
@@ -578,6 +590,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     await ready;
     if (!isTrusted && !isContent) throw new Error('SENDER_NOT_ALLOWED');
+    if (isContent && [MSG.MT_TRANSLATE, MSG.MT_PROGRESS, MSG.WORK_OPEN, MSG.WORK_UPDATE, MSG.WORK_CONTEXT].includes(msg.type)) {
+      sender = await currentPlaybackSender(sender, [msg.payload?.guid, msg.payload?.cache?.guid]);
+    }
     if (isContent && msg.type === MSG.EXTERNAL_OPEN) return EXTERNAL.open(msg.payload, await currentExternalSender(sender, msg.payload));
     if (isContent && [MSG.EXTERNAL_RESTORE, MSG.EXTERNAL_SYNC, MSG.EXTERNAL_ACTIVE, MSG.EXTERNAL_FORGET].includes(msg.type)) {
       const current = await currentExternalSender(sender, msg.payload), guid = episodeGuid(current);

@@ -18,7 +18,7 @@ const artifacts = path.join(root, 'artifacts');
 await mkdir(artifacts, { recursive: true });
 const runDir = await mkdtemp(path.join(artifacts, 'browser-'));
 const extension = path.join(runDir, 'extension');
-await cp(path.join(root, 'extension'), extension, { recursive: true });
+await cp(process.env.TEST_EXTENSION_DIR || path.join(root, 'extension'), extension, { recursive: true });
 const manifestFile = path.join(extension, 'manifest.json');
 const manifest = JSON.parse(await readFile(manifestFile, 'utf8'));
 // Only the generated test fixture pre-authorizes localhost; production remains opt-in.
@@ -127,6 +127,7 @@ try {
   let worker = browser.serviceWorkers()[0];
   if (!worker) worker = await browser.waitForEvent('serviceworker', { timeout: 15000 });
   const extensionId = new URL(worker.url()).host;
+  await worker.evaluate(() => chrome.storage.local.set({ uiLanguage: 'zh-CN' }));
   // Keep production fixed-origin validation, but route worker fetches to our local fixture.
   await worker.evaluate(base => {
     const original = self.fetch.bind(self);
@@ -187,8 +188,9 @@ try {
     assert.equal(await download.failure(), null);
     return { text: await readFile(await download.path(), 'utf8'), name: download.suggestedFilename() };
   }
-  await watch.goto('https://www.crunchyroll.com/zh-tw/watch/TEST/offline');
+  await watch.goto('https://www.crunchyroll.com/zh-tw/series/SERIES/offline');
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-configured') === 'true');
+  await watch.evaluate(() => history.pushState({}, '', '/zh-tw/watch/TEST/offline'));
   const translated = await watch.evaluate(async () => {
     const { POST } = window.CRSubFix.protocol;
     return new Promise(resolve => {
@@ -757,7 +759,7 @@ try {
   workInput = JSON.parse(requests.at(-1).body.messages[1].content);
   assert.equal(workInput.work_context.tone, '克制自然，不添加人物身份。');
   assert.equal(workInput.items.length, 4, 'A new profile revision must not mix old completed cache');
-  await watch.goto('https://www.crunchyroll.com/watch/NEXT/offline');
+  await watch.evaluate(() => history.pushState({}, '', '/watch/NEXT/offline'));
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-work-enabled') === 'true');
   await seedPlayer();
   await metadata('NEXT', 'MOCKSERIES');
@@ -765,7 +767,7 @@ try {
   await watch.locator('#cr-bsub-progress[data-state="complete"]').waitFor();
   assert.equal(requests.length, beforeConfirmedStream + 3, 'Next episode reuses confirmed profile without another generation');
   assert.equal(JSON.parse(requests.at(-1).body.messages[1].content).work_context.title, '模拟学园');
-  await watch.goto('https://www.crunchyroll.com/watch/OTHER/offline');
+  await watch.evaluate(() => history.pushState({}, '', '/watch/OTHER/offline'));
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-work-enabled') === 'true');
   await seedPlayer();
   await metadata('OTHER', 'OTHERSERIES');
@@ -781,7 +783,7 @@ try {
     await slowSource;
     await route.fulfill({ contentType: 'text/vtt', body: sourceVtt });
   });
-  await watch.goto('https://www.crunchyroll.com/watch/SLOW/offline');
+  await watch.evaluate(() => history.pushState({}, '', '/watch/SLOW/offline'));
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-configured') === 'true');
   await seedPlayer('https://www.crunchyroll.com/slow-test.vtt');
   await metadata('SLOW', 'SLOWSERIES');
@@ -821,7 +823,7 @@ try {
   await page.locator('#glossary').fill('{}');
   await page.locator('#save').click();
   await page.waitForFunction(() => document.getElementById('status').textContent === '已保存。');
-  await watch.goto('https://www.crunchyroll.com/watch/JAPANESE/offline');
+  await watch.evaluate(() => history.pushState({}, '', '/watch/JAPANESE/offline'));
   await watch.waitForFunction(() => document.documentElement.getAttribute('data-cr-mt-target') === 'ja-JP');
   await seedPlayer();
   await watch.evaluate(text => {
@@ -897,6 +899,15 @@ try {
   ] };
   await writeFile(path.join(artifacts, 'browser-results.json'), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary, null, 2));
+} catch (error) {
+  for (const page of browser?.pages() || []) {
+    console.log(JSON.stringify(await page.evaluate(() => ({
+      path: location.pathname, status: document.getElementById('status')?.textContent,
+      translationState: document.getElementById('cr-bsub-progress')?.dataset.state,
+      translationError: document.getElementById('cr-bsub-translation-hud')?.textContent,
+    })).catch(() => ({}))));
+  }
+  throw error;
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
