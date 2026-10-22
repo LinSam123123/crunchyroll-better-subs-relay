@@ -58,7 +58,8 @@ async function setup(protocol = 'chat-completions', customFetcher) {
   const opened = [];
   let currentGuid = 'ABC';
   app.ctx.chrome.tabs.create = async p => { opened.push(p); return { id: 7 }; };
-  app.ctx.chrome.tabs.sendMessage = async (_id, msg) => msg.type === 'WORK_PAGE_CHECK' ? { guid: currentGuid } : undefined;
+  app.ctx.chrome.tabs.sendMessage = async (_id, msg) => msg.type === 'WORK_PAGE_CHECK'
+    ? { guid: currentGuid, url: `https://www.crunchyroll.com/watch/${currentGuid}/title` } : undefined;
   const result = await app.send('WORK_OPEN', { guid: 'ABC', workHint: hints, samples: ['Hello Kujo', 'Hello Kuze'] }, app.content);
   assert.equal(result.ok, true);
   const snapshot = new URL(opened[0].url).searchParams.get('snapshot');
@@ -99,6 +100,7 @@ test('confirmed profile is injected only in background, merges glossary, reuses 
   assert.equal(w.network[0].input.work_context.title, profile.title);
   assert.ok(!JSON.stringify(w.network[0].input).includes(saved.profiles[0].key));
   const next = { ...w.app.content, url: 'https://www.crunchyroll.com/watch/NEXT/x' };
+  w.changePage('NEXT');
   assert.equal((await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: hints }, next)).token, resolved.token);
   assert.equal((await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: { seriesId: 'OTHER' } }, next)).token, '');
   assert.equal((await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: hints, target: 'de-DE' }, next)).token, '');
@@ -107,7 +109,9 @@ test('manual unknown identity is episode-bound, never automatically reused by ma
   const w = await setup();
   await save(w, { seriesUrl: '' });
   const next = { ...w.app.content, url: 'https://www.crunchyroll.com/watch/NEXT/x' };
+  w.changePage('NEXT');
   assert.equal((await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: hints }, next)).token, '');
+  w.changePage('ABC');
   assert.ok((await w.app.send('WORK_CONTEXT', { guid: 'ABC', workHint: {} }, w.app.content)).token);
 });
 test('profile edits invalidate only their token, reject stale requests and writes, but no-op saves preserve identity', async () => {
@@ -225,6 +229,7 @@ test('correcting current series association removes the old mapping rather than 
   const saved = await save(w), p = saved.profiles[0];
   await save(w, { key: p.key, revision: p.revision, seriesUrl: 'https://www.crunchyroll.com/series/CORRECTED/title' });
   const next = { ...w.app.content, url: 'https://www.crunchyroll.com/watch/NEXT/x' };
+  w.changePage('NEXT');
   assert.equal((await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: hints }, next)).token, '');
   const correct = await w.app.send('WORK_CONTEXT', { guid: 'NEXT', workHint: { seriesId: 'CORRECTED' } }, next);
   assert.equal(correct.token, `${p.key}:${p.revision}`);

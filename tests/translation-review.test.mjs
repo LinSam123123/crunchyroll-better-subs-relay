@@ -41,7 +41,7 @@ async function setup({ enabled = true, protocol = 'chat-completions', responder 
   const updates = [];
   app.ctx.chrome.tabs.query = async () => [{ id: 1 }];
   app.ctx.chrome.tabs.sendMessage = async (_tab, msg) => {
-    if (msg.type === 'WORK_PAGE_CHECK') return { guid };
+    if (msg.type === 'WORK_PAGE_CHECK') return { guid, url: `https://www.crunchyroll.com/watch/${guid}/title` };
     updates.push(msg);
   };
   await app.send('WORK_OPEN', { guid, workHint: { title: 'Academy', seriesId: 'SERIES' },

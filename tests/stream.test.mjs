@@ -314,11 +314,14 @@ test('stream ports reject wrong pages and episode cache before contacting a prov
   const { app, payload } = await setup(async () => { calls++; return response(end); });
   assert.equal(app.connect(app.popup).closed, true);
   assert.equal(app.connect({ ...app.content, frameId: 1 }).closed, true);
-  assert.equal(app.connect({ ...app.content, url: 'https://www.crunchyroll.com/other/watch/ABC' }).closed, true);
+  const wrongPage = app.connect({ ...app.content, url: 'https://www.crunchyroll.com/other/watch/ABC' });
+  wrongPage.post({ type: 'start', payload });
+  await waitUntil(() => wrongPage.messages.some(m => m.type === 'done'));
+  assert.equal(wrongPage.messages.at(-1).error, 'SENDER_NOT_ALLOWED');
   const port = app.connect();
   port.post({ type: 'start', payload: { ...payload, cache: { ...payload.cache, guid: 'other' } } });
   await waitUntil(() => port.messages.some(m => m.type === 'done'));
-  assert.equal(port.messages.at(-1).error, 'INVALID_CACHE_REQUEST');
+  assert.equal(port.messages.at(-1).error, 'SENDER_NOT_ALLOWED');
   assert.equal(calls, 0);
 });
 test('mode changes retain cache identity, glossary changes invalidate it, and secrets stay private', async () => {

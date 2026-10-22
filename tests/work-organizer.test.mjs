@@ -86,7 +86,8 @@ async function setup(protocol = 'chat-completions', responder) {
   await app.send('MT_SAVE_CONFIG', savePayload({ config: { ...config, protocol } }));
   let guid = 'ABC', opened;
   app.ctx.chrome.tabs.create = async value => { opened = value.url; };
-  app.ctx.chrome.tabs.sendMessage = async (_id, msg) => msg.type === 'WORK_PAGE_CHECK' ? { guid } : undefined;
+  app.ctx.chrome.tabs.sendMessage = async (_id, msg) => msg.type === 'WORK_PAGE_CHECK'
+    ? { guid, url: `https://www.crunchyroll.com/watch/${guid}/title` } : undefined;
   await app.send('WORK_OPEN', { guid: 'ABC', workHint: { title: 'Academy', seriesId: 'S' },
     samples: snapshot.samples, corpus: snapshot.corpus }, app.content);
   const key = new URL(opened).searchParams.get('snapshot');

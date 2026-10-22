@@ -39,6 +39,7 @@ npm run test:browser
 npm run test:external-browser
 npm run test:i18n-browser
 npm run test:worker-upgrade
+npm run test:playback-browser
 ```
 
 Generated profiles/screenshots stay in ignored `artifacts/`; do not publish them by default. A passing mock suite does not establish end-to-end success against real Crunchyroll accounts, every provider, or every episode.
@@ -47,9 +48,10 @@ Generated profiles/screenshots stay in ignored `artifacts/`; do not publish them
 
 - `lib/local-translator.js`, `local-translation-ui.js`: experimental keyless browser Translator engine. An explicitly prepared `translation.html` page owns the model session; it must stay open. A strictly validated runtime port carries bounded single-cue requests from the worker. No cloud fallback or paid budget applies. Preserve cloud credentials when switching providers. Test with `npm run test:local-browser`; its normal mode mocks translation and only probes real capability. `LOCAL_LIVE=1` explicitly downloads a browser model and translates a synthetic sample; it never invokes cloud translation. Automated browsers must permit component updates for a meaningful capability probe.
 
-- `extension/background.js`: trusted worker source, settings/permissions, API calls, translation progress, source orchestration and bridge routing. The manifest loads generated `background-worker.js`, which bundles startup dependencies without runtime `importScripts` fetches.
+- `extension/background.js`: trusted worker source, settings/permissions, API calls, translation progress, source orchestration and bridge routing. Resolve playback-scoped requests through `currentPlaybackSender`: MessageSender.url can retain the pre-SPA document URL. Query the isolated script in the sender's document (documentId when available), reject mismatched episode IDs, and never trust a payload URL. Stream ports verify the current page on start. The manifest loads generated `background-worker.js`, which bundles startup dependencies without runtime `importScripts` fetches.
 - `extension/content.js`: isolated-world bridge, playback identity/metadata and subtitle overlay integration.
 - `extension/interceptor.js`: MAIN-world playback interception and player controls. Never receives raw API keys.
+- `extension/lib/playback-capture.js`: bounded, memory-only playback inbox keyed by request GUID and explicit audio-version IDs. Captures pre-navigation requests, drains on the matching watch route, discards disposed viewings and expires entries. Never persist or export these authenticated response records. Subtitle bootstrap must not reload the document or restart the video; the playback browser suite checks both request/route orderings and old-response isolation.
 - `extension/lib/protocol.js`, `settings-schema.js`, `storage.js`: cross-context contracts, validation and trusted settings/storage boundaries.
 - `extension/lib/i18n.js`, `i18n-*.js`: bundled UI catalogs. `uiLanguage` is independent of subtitle target/source and provider configuration. Never translate data, prompts or user inputs to localize UI. Add catalog entries and use `t()` for dynamic labels; use `localize()` only on extension-owned UI. MAIN-world locale follows the allowlisted settings attribute, not direct storage access. No remote translation or broad website DOM observer.
 - `extension/lib/relay.js`, `mt-utils.js`, `relay-stream.js`: provider payloads, stable cue IDs, retries, batching/concurrency and SSE parsing. Check existing exports before edits.
@@ -77,5 +79,5 @@ Edit `background.js`, `settings-schema.js` and `protocol.js`, not generated `bac
 2. Validate stable cue IDs, out-of-order streams, partial-progress resume, cancellation, timeout/429, per-work identity, permissions and error sanitization when those surfaces change.
 3. Follow changes must test title/hash variation, format/platform/revision isolation, ambiguous/missing episodes, next/previous navigation, offset inheritance and stale metadata.
 4. Run build, unit tests, privacy scan, relevant browser suites. Report precisely what was tested and what was not.
-5. Keep package/manifest versions consistent: `2.7.0.33` maps to package `2.7.0-relay.33`. Rebuild and package; scan archive/attachments and reachable Git history, not just the working tree.
+5. Keep package/manifest versions consistent: `2.7.0.35` maps to package `2.7.0-relay.35`. Rebuild and package; scan archive/attachments and reachable Git history, not just the working tree.
 6. Publish only reviewed source and release artifacts. Do not upload ignored directories, real samples or another repository's history. Never claim automated scanning proves absolute absence of secrets.

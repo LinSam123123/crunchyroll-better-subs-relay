@@ -8,6 +8,19 @@ An unofficial Crunchyroll subtitle extension for choosing official tracks, findi
 
 Based on [Better Subs for Crunchyroll](https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll), with thanks to its creator, anitastic-pixel. This fork is not an official release from Crunchyroll or the upstream author.
 
+## New in 2.7.0.35
+
+- Fix incorrect `SENDER_NOT_ALLOWED` translation errors after entering a video from a series page or switching episodes without reloading.
+- Batch translation, streaming, saved progress and work profiles verify the current episode. Stale requests for another episode remain blocked.
+- Reload the extension and reopen the playback page once after updating. No uninstall or API key re-entry is required.
+
+## New in 2.7.0.34
+
+- Capture subtitle metadata requested before the watch URL changes, including entry from a series page and next-episode navigation.
+- Handle Request/URL inputs and Japanese playback responses without a versions list; discard responses from departed episodes.
+- Subtitle bootstrap no longer automatically reloads the document or restarts the video. Continued RTX VSR activation across browser/driver combinations is not guaranteed.
+- Reload the extension and reopen playback once after updating.
+
 ## New in 2.7.0.33
 
 - Experimental browser-local translation without an API key. Download the model on first use and keep the translation settings tab open.

@@ -79,7 +79,7 @@ test('background source supplementation is scoped to tab/episode and cannot over
   const app = background();
   await app.send('MT_SAVE_CONFIG', savePayload());
   app.ctx.chrome.tabs.create = async () => ({ id: 7 });
-  app.ctx.chrome.tabs.sendMessage = async () => ({ guid: 'ABC' });
+  app.ctx.chrome.tabs.sendMessage = async () => ({ guid: 'ABC', url: app.content.url });
   const opened = await app.send('WORK_OPEN', { guid: 'ABC', loading: true, samples: [], corpus: [] }, app.content);
   assert.equal(opened.ok, true);
   const p = { snapshot: opened.snapshot, guid: 'ABC', samples: ['English'], corpus: ['English'],
