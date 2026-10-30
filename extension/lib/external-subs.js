@@ -409,13 +409,13 @@
       ctx.snapshot = payload.snapshot;
       if (typeof payload.filename !== 'string' || !payload.filename || payload.filename.length > 700) fail('ASSRT_FILE_CHANGED');
       const cached = db.files.find(f => f.guid === ctx.meta.guid && sourceName(f) === source && f.subId === subId && f.name === payload.filename &&
-        (!payload.fileId || f.fileId === payload.fileId) &&
+        (source === 'assrt' ? (f.fileId || '') === (payload.fileId || '') : !payload.fileId || f.fileId === payload.fileId) &&
         f.requestedEncoding === (payload.encoding || 'auto'));
       if (cached && payload.refresh !== true) return fileResult(cached, db.selections[ctx.meta.guid], true);
       const detail = resolvedDetail || await providerDetail(ctx, source, subId);
       await context(payload.snapshot);
       if (!await chrome.permissions.contains({ origins: provider.ORIGINS })) fail(errorCode(source, 'PERMISSION_REQUIRED'));
-      const file = source === 'assrt' ? await A.download(detail, payload.filename, payload.encoding || 'auto', fetcher, await httpAllowed()) :
+      const file = source === 'assrt' ? await A.download(detail, payload.filename, payload.encoding || 'auto', fetcher, await httpAllowed(), payload.fileId || '') :
         source === 'jimaku' ? await jimakuApi(() => J.download(detail, payload.filename, payload.encoding || 'auto', fetcher, payload.fileId || '')) :
           await D.download(detail, payload.filename, payload.encoding || 'auto', fetcher, payload.fileId || '');
       const cues = self.CRSubFix.parser.parseSubtitles(file.text, file.name);
@@ -423,7 +423,7 @@
           c.start < 0 || c.end <= c.start || c.text.length > 30000)) fail(errorCode(source, 'INVALID_FILE'));
       if (source === 'jimaku') file.language = J.detectLanguage(cues, file.language);
       await context(payload.snapshot);
-      const hash = await self.CRSubFix.mtUtils.fingerprint(cues, source !== 'assrt' ? `${file.fileId || ''}:${file.name}\n${file.text}` : file.text);
+      const hash = await self.CRSubFix.mtUtils.fingerprint(cues, source !== 'assrt' || file.fileId ? `${file.fileId || ''}:${file.name}\n${file.text}` : file.text);
       const identity = db.identities[ctx.meta.guid] || ctx.meta;
       const record = { ...file, subId, guid: ctx.meta.guid, seriesId: identity.seriesId,
         season: identity.season, episode: identity.episode, source, key: `${ctx.meta.guid}:${source}:${subId}:${hash}`,
@@ -459,6 +459,7 @@
         if (!C.identity(identity)) fail('FOLLOW_METADATA_REQUIRED');
         const mapping = payload.collectionMap?.length ? C.validateMap((await collection({ snapshot: payload.snapshot,
           source: sourceName(record), id: record.subId })).files, payload.collectionMap, { name: record.name, fileId: record.fileId || '' }, identity) : null;
+        if (sourceName(record) === 'assrt' && record.fileId && !mapping) fail('FOLLOW_MAP_REQUIRED');
         const structured = sourceName(record) === 'subdl' && record.fileEpisode === identity.episode && record.fileSeason === identity.season;
         if (C.special(record.name)) fail('FOLLOW_FILENAME_UNCLEAR');
         if ((!parsed || parsed.episode !== identity.episode || (parsed.season !== null && parsed.season !== identity.season)) && !structured && !mapping)

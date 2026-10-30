@@ -39,6 +39,62 @@ const preview = w => w.send('EXTERNAL_PREVIEW', { id: 42, filename: 'episode.srt
 const apply = (w, p, extra = {}) => w.send('EXTERNAL_APPLY', { key: p.key, lang: 'zh-CN',
   sync: { mode: 'linear', scale: 1, offset: -1 }, ...extra });
 
+const duplicateName = episode => `[Demo-Raws] Academy S ${String(episode).padStart(2, '0')} [BDRip 1920x1080 x264 FLAC].ass`;
+const duplicatePack = () => ({ id: 42, filelist: [1, 25].flatMap(start => [2, 3].map((episode, n) => ({
+  f: duplicateName(episode), s: start === 1 ? 100 : 200,
+  url: `https://file0.assrt.net/onthefly/42/-/${start + n}/${encodeURIComponent(duplicateName(episode))}?signed=temporary`,
+}))) });
+
+test('assrt duplicate names use stable source IDs, not list order or expiring URL queries', async () => {
+  const A = adapter(), pack = duplicatePack(), files = A.files(pack);
+  assert.deepEqual(json(files.map(f => f.fileId)), ['assrt:42:1', 'assrt:42:2', 'assrt:42:25', 'assrt:42:26']);
+  pack.filelist.reverse(); pack.filelist.forEach(f => { f.url = f.url.replace('signed=temporary', 'signed=refreshed'); });
+  assert.equal(A.files(pack)[0].fileId, 'assrt:42:26');
+  let requested = '';
+  const result = await A.download(pack, duplicateName(2), 'auto', async url => { requested = url; return response(srt); }, false, 'assrt:42:25');
+  assert.equal(result.fileId, 'assrt:42:25'); assert.match(requested, /\/25\//);
+  await assert.rejects(A.download(pack, duplicateName(2)), /ASSRT_FILE_CHANGED/);
+  await assert.rejects(A.download(pack, duplicateName(2), 'auto', undefined, false, 'assrt:42:26'), /ASSRT_FILE_CHANGED/);
+  const unique = { ...pack, filelist: [pack.filelist[0]] };
+  assert.equal(A.files(unique)[0].fileId, '', 'Unique names preserve legacy follow rules');
+});
+
+test('duplicate IDs are not taken from a different package, foreign URL or signing token', () => {
+  const A = adapter(), pack = duplicatePack();
+  pack.filelist[0].url = 'https://evil.example/onthefly/42/-/1/a.ass';
+  pack.filelist[1].url = 'https://file0.assrt.net/onthefly/99/-/2/a.ass';
+  pack.filelist[2].url = 'https://file0.assrt.net/file.ass?signed=private';
+  assert.ok(A.files(pack).slice(0, 3).every(f => f.fileId === ''));
+});
+
+test('same-name files with identical contents retain separate caches and explicit follow mappings', async () => {
+  const pack = duplicatePack();
+  const ass = '[Script Info]\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n' +
+    'Dialogue: 0,0:00:02.00,0:00:05.00,Default,,0,0,0,,Synthetic dialogue\n';
+  const w = await setup({ fetcher: async url => url.includes('/sub/detail')
+    ? response({ status: 0, sub: { subs: [pack] } }) : response(ass) });
+  const detail = await w.send('EXTERNAL_DETAIL', { id: 42 });
+  assert.ok(!JSON.stringify(detail).includes('signed='));
+  const first = await w.send('EXTERNAL_PREVIEW', { id: 42, filename: duplicateName(2), fileId: 'assrt:42:1' });
+  const second = await w.send('EXTERNAL_PREVIEW', { id: 42, filename: duplicateName(2), fileId: 'assrt:42:25' });
+  assert.equal(first.ok, true, JSON.stringify(first)); assert.equal(second.ok, true, JSON.stringify(second)); assert.notEqual(first.key, second.key);
+  assert.equal((await apply(w, second, { follow: true,
+    metadata: { seriesId: 'SERIES', guid: 'ABC', title: 'Academy', season: 1, episode: 2 } })).error, 'FOLLOW_MAP_REQUIRED');
+  assert.equal((await w.send('EXTERNAL_PREVIEW', { id: 42, filename: duplicateName(2) })).error, 'ASSRT_FILE_CHANGED');
+  const mapping = [{ name: duplicateName(2), fileId: 'assrt:42:25', episode: 2 },
+    { name: duplicateName(3), fileId: 'assrt:42:26', episode: 3 }];
+  const saved = await apply(w, second, { follow: true, collectionMap: mapping,
+    metadata: { seriesId: 'SERIES', guid: 'ABC', title: 'Academy', season: 1, episode: 2 } });
+  assert.equal(saved.ok, true, JSON.stringify(saved));
+  w.navigate('NEXT');
+  const restored = await w.app.send('EXTERNAL_RESTORE', { guid: 'NEXT', metadata: {
+    seriesId: 'SERIES', guid: 'NEXT', title: 'Academy', season: 1, episode: 3,
+  } }, { ...w.app.content, url: 'https://www.crunchyroll.com/watch/NEXT/title' });
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.ok(w.network.some(r => r.url.includes('/onthefly/42/-/26/')));
+  assert.ok(!w.network.some(r => r.url.includes('/onthefly/42/-/2/')));
+});
+
 test('assrt searches send only bearer authorization, strict HTTPS and bounded queries', async () => {
   const A = adapter(), seen = [];
   const results = await A.search(KEY, 'Synthetic Academy', 15, true, async (url, init) => {

@@ -2070,7 +2070,18 @@
     const list = Array.isArray(value.filelist) && value.filelist.length
       ? value.filelist.map(f => ({ name: clean(f.f, 700), size: clean(String(f.s ?? ''), 60), url: f.url }))
       : [{ name: clean(value.filename || value.sub_name, 700), size: clean(String(value.size ?? ''), 60), url: value.url }];
-    return list.slice(0, 500).map(f => ({ ...f, format: format(f.name), oversized: oversized(f.size) })).filter(f => f.name);
+    return list.slice(0, 500).map(f => {
+      let fileId = '';
+      if (list.filter(other => other.name === f.name).length > 1) {
+        try {
+          const url = new URL(f.url);
+          const part = url.pathname.match(/^\/onthefly\/(\d{1,12})\/[^/]+\/(\d{1,12})\//);
+          if (/^file\d*\.assrt\.net$/i.test(url.hostname) && part &&
+              String(value.id ?? value.fileid) === part[1]) fileId = `assrt:${part[1]}:${part[2]}`;
+        } catch (_) { /* Ambiguous names without a stable source ID remain unselectable. */ }
+      }
+      return { ...f, fileId, format: format(f.name), oversized: oversized(f.size) };
+    }).filter(f => f.name);
   }
   function decode(bytes, encoding = 'auto') {
     if (!['auto', 'utf-8', 'gb18030', 'big5', 'shift_jis', 'utf-16le', 'utf-16be'].includes(encoding)) fail('ASSRT_INVALID_ENCODING');
@@ -2086,8 +2097,8 @@
     try { return { text: new TextDecoder(selected, { fatal: true }).decode(bytes), encoding: selected }; }
     catch (_) { fail('ASSRT_DECODE_FAILED'); }
   }
-  async function download(value, filename, encoding = 'auto', fetcher = fetch, allowHttp = false) {
-    const matches = files(value).filter(f => f.name === filename);
+  async function download(value, filename, encoding = 'auto', fetcher = fetch, allowHttp = false, fileId = '') {
+    const matches = files(value).filter(f => f.name === filename && (!fileId || f.fileId === fileId));
     if (matches.length !== 1) fail('ASSRT_FILE_CHANGED');
     const file = matches[0];
     if (!file.format) fail('ASSRT_UNSUPPORTED_FILE');
@@ -2112,7 +2123,7 @@
           // A HTML error page must not enter the subtitle parser as if it were a file.
           const result = decode(bytes, encoding);
           if (/^\s*(?:<!doctype html|<html|<head)/i.test(result.text)) fail('ASSRT_INVALID_FILE');
-          return { name: file.name, format: file.format, bytes: bytes.length, ...result };
+          return { name: file.name, fileId: file.fileId, format: file.format, bytes: bytes.length, ...result };
         } catch (error) {
           if (netError && !/^ASSRT_/.test(error?.message || '') && !['TimeoutError', 'AbortError'].includes(error?.name))
             fail(`ASSRT_DOWNLOAD_${netError}`);
@@ -2540,6 +2551,7 @@
       /[\[【](\d{1,3})[\]】]/g,
       /-\s*(\d{1,3})(?=[\s.(\[]|-JPN\b|$)/gi,
       /(?:^|[ ._])(\d{1,3})(?=\.(?:ass|ssa|srt|vtt)$)/gi,
+      /(?:^|[ ._])(\d{1,2}|0\d{2})(?=\s+[\[(](?:BDRip|BD|Blu-?ray|WEB(?:-?DL|Rip)?|HDTV|DVD)\b)/gi,
     ];
     const episodeText = name.replace(/[「『][^」』]*[」』]/g, value => ' '.repeat(value.length));
     for (const pattern of patterns) {
@@ -2776,10 +2788,15 @@
     if (!Array.isArray(files) || files.length > 500 || !files.some(f => f.name === anchor.name && (f.fileId || '') === (anchor.fileId || '')))
       throw new Error('ASSIST_TOO_LARGE');
     const compatible = files.filter(f => f.format && NS.collectionMatch.compatible(anchor.name, f.name));
-    const rows = compatible.map((f, index) => ({ id: String(index), name: f.name, fileId: f.fileId || '', known_episode: NS.collectionMatch.parse(f.name)?.episode ?? null }));
+    const rows = compatible.map((f, index) => ({ id: String(index), name: f.name, fileId: f.fileId || '',
+      size: f.size || '', format: f.format, language_hint: f.language || '',
+      known_episode: NS.collectionMatch.parse(f.name)?.episode ?? null }));
     const input = { task: 'subtitle-collection', title: meta.title, season: meta.season, episode: meta.episode, selected_file: anchor.name,
       files: rows, schema: { files: [{ id: 'supplied file id', episode: 'integer or null', same_release: 'boolean' }] },
-      requirement: 'Classify only files in the exact selected release. Include each supplied id at most once. Do not merge similar releases.' };
+      requirement: 'Classify only files in the exact selected release. Include each supplied id at most once. Do not merge similar releases. ' +
+        'Different file IDs with the same name are distinct files. Sizes are not evidence of language or release. ' +
+        'No subtitle contents are supplied. Never infer actual language from identical names, size or list order. ' +
+        'Select at most one file per episode; leave ambiguous alternatives unselected.' };
     if (JSON.stringify(input).length > 60000) throw new Error('ASSIST_TOO_LARGE');
     return input;
   }
@@ -3256,13 +3273,13 @@
       ctx.snapshot = payload.snapshot;
       if (typeof payload.filename !== 'string' || !payload.filename || payload.filename.length > 700) fail('ASSRT_FILE_CHANGED');
       const cached = db.files.find(f => f.guid === ctx.meta.guid && sourceName(f) === source && f.subId === subId && f.name === payload.filename &&
-        (!payload.fileId || f.fileId === payload.fileId) &&
+        (source === 'assrt' ? (f.fileId || '') === (payload.fileId || '') : !payload.fileId || f.fileId === payload.fileId) &&
         f.requestedEncoding === (payload.encoding || 'auto'));
       if (cached && payload.refresh !== true) return fileResult(cached, db.selections[ctx.meta.guid], true);
       const detail = resolvedDetail || await providerDetail(ctx, source, subId);
       await context(payload.snapshot);
       if (!await chrome.permissions.contains({ origins: provider.ORIGINS })) fail(errorCode(source, 'PERMISSION_REQUIRED'));
-      const file = source === 'assrt' ? await A.download(detail, payload.filename, payload.encoding || 'auto', fetcher, await httpAllowed()) :
+      const file = source === 'assrt' ? await A.download(detail, payload.filename, payload.encoding || 'auto', fetcher, await httpAllowed(), payload.fileId || '') :
         source === 'jimaku' ? await jimakuApi(() => J.download(detail, payload.filename, payload.encoding || 'auto', fetcher, payload.fileId || '')) :
           await D.download(detail, payload.filename, payload.encoding || 'auto', fetcher, payload.fileId || '');
       const cues = self.CRSubFix.parser.parseSubtitles(file.text, file.name);
@@ -3270,7 +3287,7 @@
           c.start < 0 || c.end <= c.start || c.text.length > 30000)) fail(errorCode(source, 'INVALID_FILE'));
       if (source === 'jimaku') file.language = J.detectLanguage(cues, file.language);
       await context(payload.snapshot);
-      const hash = await self.CRSubFix.mtUtils.fingerprint(cues, source !== 'assrt' ? `${file.fileId || ''}:${file.name}\n${file.text}` : file.text);
+      const hash = await self.CRSubFix.mtUtils.fingerprint(cues, source !== 'assrt' || file.fileId ? `${file.fileId || ''}:${file.name}\n${file.text}` : file.text);
       const identity = db.identities[ctx.meta.guid] || ctx.meta;
       const record = { ...file, subId, guid: ctx.meta.guid, seriesId: identity.seriesId,
         season: identity.season, episode: identity.episode, source, key: `${ctx.meta.guid}:${source}:${subId}:${hash}`,
@@ -3306,6 +3323,7 @@
         if (!C.identity(identity)) fail('FOLLOW_METADATA_REQUIRED');
         const mapping = payload.collectionMap?.length ? C.validateMap((await collection({ snapshot: payload.snapshot,
           source: sourceName(record), id: record.subId })).files, payload.collectionMap, { name: record.name, fileId: record.fileId || '' }, identity) : null;
+        if (sourceName(record) === 'assrt' && record.fileId && !mapping) fail('FOLLOW_MAP_REQUIRED');
         const structured = sourceName(record) === 'subdl' && record.fileEpisode === identity.episode && record.fileSeason === identity.season;
         if (C.special(record.name)) fail('FOLLOW_FILENAME_UNCLEAR');
         if ((!parsed || parsed.episode !== identity.episode || (parsed.season !== null && parsed.season !== identity.season)) && !structured && !mapping)

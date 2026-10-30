@@ -8,6 +8,14 @@ An unofficial Crunchyroll subtitle extension for choosing official tracks, findi
 
 Based on [Better Subs for Crunchyroll](https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll), with thanks to its creator, anitastic-pixel. This fork is not an official release from Crunchyroll or the upstream author.
 
+## New in 2.7.0.36
+
+- Distinguish same-name assrt files by stable source IDs and sizes, preserving their identities through preview, caching and confirmed episode mappings.
+- Recognize episode numbers in names such as `Title S 01 [BDRip ...].ass` without treating the title's letter S as a season number.
+- Select one file per episode. Confirming a mapping selects the current episode's file and clears any previous preview.
+- Optional AI analysis uses filenames and available IDs, sizes, formats and source language hints, not subtitle contents. Size or list order alone never establish a language or release.
+- Following a collection with duplicate names requires a confirmed mapping. Disable following to load only the current episode; unmapped episodes are not guessed.
+
 ## New in 2.7.0.35
 
 - Fix incorrect `SENDER_NOT_ALLOWED` translation errors after entering a video from a series page or switching episodes without reloading.

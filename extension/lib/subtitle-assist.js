@@ -14,10 +14,15 @@
     if (!Array.isArray(files) || files.length > 500 || !files.some(f => f.name === anchor.name && (f.fileId || '') === (anchor.fileId || '')))
       throw new Error('ASSIST_TOO_LARGE');
     const compatible = files.filter(f => f.format && NS.collectionMatch.compatible(anchor.name, f.name));
-    const rows = compatible.map((f, index) => ({ id: String(index), name: f.name, fileId: f.fileId || '', known_episode: NS.collectionMatch.parse(f.name)?.episode ?? null }));
+    const rows = compatible.map((f, index) => ({ id: String(index), name: f.name, fileId: f.fileId || '',
+      size: f.size || '', format: f.format, language_hint: f.language || '',
+      known_episode: NS.collectionMatch.parse(f.name)?.episode ?? null }));
     const input = { task: 'subtitle-collection', title: meta.title, season: meta.season, episode: meta.episode, selected_file: anchor.name,
       files: rows, schema: { files: [{ id: 'supplied file id', episode: 'integer or null', same_release: 'boolean' }] },
-      requirement: 'Classify only files in the exact selected release. Include each supplied id at most once. Do not merge similar releases.' };
+      requirement: 'Classify only files in the exact selected release. Include each supplied id at most once. Do not merge similar releases. ' +
+        'Different file IDs with the same name are distinct files. Sizes are not evidence of language or release. ' +
+        'No subtitle contents are supplied. Never infer actual language from identical names, size or list order. ' +
+        'Select at most one file per episode; leave ambiguous alternatives unselected.' };
     if (JSON.stringify(input).length > 60000) throw new Error('ASSIST_TOO_LARGE');
     return input;
   }

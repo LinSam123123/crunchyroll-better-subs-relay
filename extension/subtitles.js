@@ -77,6 +77,7 @@
     ASSRT_DOWNLOAD_HTTP_403: '下载链接已过期或服务拒绝访问，请重新下载预览。',
     ASSRT_DOWNLOAD_UNSAFE: '下载链接不在允许的 assrt HTTPS 域名内。',
     ASSRT_FILE_CHANGED: '文件列表已变化或存在重名，请重新选择候选。',
+    FOLLOW_MAP_REQUIRED: '同名字幕有多个版本。请先确认集数对应，再启用跟随；仅加载当前集可取消跟随。',
     ASSRT_UNSUPPORTED_FILE: '此文件不是独立 ASS/SRT/SSA/VTT 字幕。可下载后解压并使用播放器本地上传。',
     ASSRT_INVALID_FILE: '没有找到有效字幕，可能不是字幕文件或编码错误。',
     ASSRT_DECODE_FAILED: '无法解码，请更换编码后再次预览。',

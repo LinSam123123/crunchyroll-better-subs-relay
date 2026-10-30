@@ -13,6 +13,29 @@ const atx = (ep, format = 'ass') => `Tokidoki Bosotto Russia-go de Dereru Tonari
 const ember = ep => `[EMBER] Alya Sometimes Hides Her Feelings in Russian S01E${String(ep).padStart(2, '0')}-Episode ${ep} [${ep === 4 ? '70B120D6' : 'ABCDEF12'}].ja.srt`;
 const file = name => ({ name, fileId: name, format: name.endsWith('.srt') ? 'SRT' : 'ASS' });
 
+test('bare episode before release metadata preserves title suffix letters and separates duplicate files', () => {
+  const C = engine().collectionMatch;
+  const name = episode => `[Demo] Academy S ${String(episode).padStart(2, '0')} [BDRip 1920x1080 x264 FLAC].ass`;
+  const files = [1, 2, 3].flatMap(episode => [0, 1].map(version => ({ ...file(name(episode)), fileId: `file-${episode}-${version}` })));
+  assert.equal(C.parse(name(2)).episode, 2); assert.equal(C.parse(name(2)).season, null);
+  const groups = C.groups(files);
+  assert.equal(groups.length, 1); assert.equal(groups[0].episodes.length, 3); assert.equal(groups[0].files.length, 6);
+  assert.equal(C.select(files, { signature: groups[0].signature }, { season: 1, episode: 2 }).length, 2);
+  for (const invalid of ['Show 1080 [BDRip].ass', 'Show 01-02 [BDRip].ass', 'Show 01 02 [BDRip].ass',
+    'Show SP 01 [BDRip].ass', 'Show 01 [Unknown].ass']) assert.equal(C.parse(invalid), null, invalid);
+});
+
+test('AI sees distinct file IDs and metadata but no fabricated language evidence for identical names', () => {
+  const A = engine().subtitleAssist;
+  const files = ['1', '25'].map((id, i) => ({ name: 'Academy S 02 [BDRip].ass', fileId: `assrt:42:${id}`, format: 'ASS', size: String(100 + i * 100) }));
+  const input = A.prepareFiles({ ...meta, episode: 2 }, files, files[0]);
+  assert.equal(input.files.length, 2); assert.notEqual(input.files[0].fileId, input.files[1].fileId);
+  assert.equal(input.files[0].known_episode, 2); assert.equal(input.files[0].language_hint, '');
+  assert.match(input.requirement, /No subtitle contents/);
+  const parsed = A.parseFiles({ files: [{ id: '1', episode: 2, same_release: true }] }, input);
+  assert.equal(parsed[0].fileId, 'assrt:42:25');
+});
+
 test('changing Netflix episode titles preserves one release for all twelve episodes', () => {
   const C = engine().collectionMatch, files = Array.from({ length: 12 }, (_, i) => file(netflix(i + 1)));
   const groups = C.groups(files);

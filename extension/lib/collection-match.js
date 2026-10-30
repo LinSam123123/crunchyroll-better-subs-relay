@@ -11,6 +11,7 @@
       /[\[【](\d{1,3})[\]】]/g,
       /-\s*(\d{1,3})(?=[\s.(\[]|-JPN\b|$)/gi,
       /(?:^|[ ._])(\d{1,3})(?=\.(?:ass|ssa|srt|vtt)$)/gi,
+      /(?:^|[ ._])(\d{1,2}|0\d{2})(?=\s+[\[(](?:BDRip|BD|Blu-?ray|WEB(?:-?DL|Rip)?|HDTV|DVD)\b)/gi,
     ];
     const episodeText = name.replace(/[「『][^」』]*[」』]/g, value => ' '.repeat(value.length));
     for (const pattern of patterns) {

@@ -1,6 +1,6 @@
 {
   "name": "crunchyroll-better-subs-relay",
-  "version": "2.7.0-relay.35",
+  "version": "2.7.0-relay.36",
   "private": true,
   "license": "MIT",
   "engines": { "node": ">=22" },
