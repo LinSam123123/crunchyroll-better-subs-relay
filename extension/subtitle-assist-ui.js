@@ -25,6 +25,13 @@
     let simplified, traditional;
     const selectedFile = () => files.find(f => f.name === el('files').value && (f.fileId || '') === fileId());
     const selectedGroup = () => groups.find(g => g.files.some(f => f.name === selectedFile()?.name && (f.fileId || '') === fileId()));
+    const distinct = file => files.filter(f => f.name === file.name && (f.fileId || '') === (file.fileId || '')).length === 1;
+    function fileLabel(file) {
+      if (files.filter(f => f.name === file.name).length < 2) return file.name;
+      const id = /^assrt:\d+:(\d+)$/.exec(file.fileId || '')?.[1];
+      const size = /^\d+$/.test(String(file.size)) ? t('{n} 字节', { n: file.size }) : file.size || t('大小未知');
+      return `${id ? t('来源编号 {id}', { id }) : t('同名文件')} · ${size} · ${file.name}`;
+    }
     function names(meta, state = nameState) {
       nameState = state || { records: [], choices: {} };
       simplified ||= self.OpenCC.Converter({ from: 'tw', to: 'cn' });
@@ -86,14 +93,15 @@
       el('files').replaceChildren(...visible.map(file => {
         const p = C.parse(file.name), episode = p?.episode ?? file.episode;
         const option = new Option('', file.name);
-        ui(option, () => `${episode ? t('第 {n} 集 · ', { n: episode }) : ''}${file.name} · ${file.format || t('压缩包 / 未知格式')} · ${file.language || t('语种待核对')}${file.oversized ? t(' · 超过在线加载上限') : ''}`);
+        ui(option, () => `${episode ? t('第 {n} 集 · ', { n: episode }) : ''}${fileLabel(file)} · ${file.format || t('压缩包 / 未知格式')} · ${file.language || t('语种待核对')}${file.oversized ? t(' · 超过在线加载上限') : ''}`);
         option.dataset.fileId = file.fileId || '';
-        option.disabled = !file.format && !(chosen()?.source === 'jimaku' && /\.zip$/i.test(file.name));
+        option.disabled = !distinct(file) || !file.format && !(chosen()?.source === 'jimaku' && /\.zip$/i.test(file.name));
         return option;
       }));
-      const target = visible.find(f => f.name === preferred?.name && (f.fileId || '') === (preferred?.fileId || '')) ||
-        visible.find(f => (C.parse(f.name)?.episode ?? f.episode) === Number(metadata().episode) && f.format) || visible.find(f => f.format) || visible[0];
-      if (target) el('files').selectedIndex = visible.indexOf(target);
+      const usable = visible.filter(distinct);
+      const target = usable.find(f => f.name === preferred?.name && (f.fileId || '') === (preferred?.fileId || '')) ||
+        usable.find(f => (C.parse(f.name)?.episode ?? f.episode) === Number(metadata().episode) && f.format) || usable.find(f => f.format) || usable[0];
+      el('files').selectedIndex = target ? visible.indexOf(target) : -1;
       fileChanged(false);
     }
     function setFiles(value, rule, selected) {
@@ -117,7 +125,7 @@
       el('versions').replaceChildren(all, ...groups.map(g => {
         const traits = g.traits, marker = traits.group ? `[${traits.group}]` : g.label.split(/S\d+E\d+| - \d+/i)[0].slice(0, 65);
         const option = new Option('', g.signature);
-        ui(option, () => [marker, traits.platforms, traits.format.toUpperCase(), traits.accessibility.toUpperCase(), traits.revision,
+        ui(option, () => [g.signature.startsWith('confirmed:') ? t('已确认的文件组') : '', marker, traits.platforms, traits.format.toUpperCase(), traits.accessibility.toUpperCase(), traits.revision,
           t('{episodes} 集 / {files} 文件', { episodes: g.episodes.length, files: g.files.length })].filter(Boolean).join(' · '));
         return option;
       }));
@@ -151,18 +159,36 @@
       ui(el('mapInfo'), () => suggestions ? t('· AI 候选未确认') : '');
       el('mappingRows').replaceChildren();
       if (!anchor) return;
-      for (const file of files.filter(f => f.format && C.compatible(anchor.name, f.name))) {
+      const candidates = files.filter(f => f.format && C.compatible(anchor.name, f.name));
+      const episodeNumbers = new Map(candidates.map(file => [file, C.parse(file.name)?.episode ?? (suggestions ? suggestions.find(s => s.name === file.name &&
+        (s.fileId || '') === (file.fileId || ''))?.episode : file.episode)]));
+      const episodeFor = file => episodeNumbers.get(file);
+      for (const file of candidates) {
         const parsed = C.parse(file.name), suggestion = suggestions?.find(s => s.name === file.name && (s.fileId || '') === (file.fileId || '')), tr = document.createElement('tr');
         const selected = file.name === anchor.name && (file.fileId || '') === (anchor.fileId || '');
         const check = document.createElement('input'); check.type = 'checkbox';
-        check.checked = selected || (suggestions ? suggestion?.selected === true : group?.files.some(f => f.name === file.name && (f.fileId || '') === (file.fileId || '')));
-        check.disabled = selected; ui(check, () => t('包含 {name}', { name: file.name }), 'ariaLabel');
+        const episode = episodeFor(file);
+        const proposed = candidates.filter(f => episodeFor(f) === episode && (!suggestions || suggestions.some(s =>
+          s.name === f.name && (s.fileId || '') === (f.fileId || '') && s.selected === true)));
+        check.checked = distinct(file) && (selected || episode !== episodeFor(anchor) && proposed.length === 1 && (suggestions ? suggestion?.selected === true :
+          group?.files.some(f => f.name === file.name && (f.fileId || '') === (file.fileId || ''))));
+        check.disabled = !distinct(file); ui(check, () => t('包含 {name}', { name: fileLabel(file) }), 'ariaLabel');
         const input = document.createElement('input'); input.type = 'number'; input.min = '1'; input.max = '9999'; input.step = '1';
         input.value = String(parsed?.episode ?? (suggestions ? suggestion?.episode : file.episode) ?? (selected ? metadata().episode : '') ?? '');
         input.readOnly = !!parsed; ui(input, () => t('{name} 的集数', { name: file.name }), 'ariaLabel');
         tr.dataset.name = file.name; tr.dataset.fileId = file.fileId || '';
-        for (const child of [check, input, document.createTextNode(file.name)]) { const td = document.createElement('td'); td.append(child); tr.append(td); }
-        for (const control of [check, input]) control.addEventListener('input', () => { confirmed = null; ui(el('mapInfo'), () => t('· 修改未确认')); });
+        const label = document.createElement('span'); ui(label, () => fileLabel(file));
+        for (const child of [check, input, label]) { const td = document.createElement('td'); td.append(child); tr.append(td); }
+        for (const control of [check, input]) control.addEventListener('input', () => {
+          confirmed = null;
+          if (check.checked && Number(input.value) > 0) {
+            for (const other of el('mappingRows').children) {
+              if (other !== tr && Number(other.querySelector('input[type=number]').value) === Number(input.value))
+                other.querySelector('input[type=checkbox]').checked = false;
+            }
+          }
+          ui(el('mapInfo'), () => t('· 修改未确认'));
+        });
         el('mappingRows').append(tr);
       }
     }
@@ -170,9 +196,16 @@
       const rows = [...el('mappingRows').children].filter(tr => tr.querySelector('input[type=checkbox]').checked)
         .map(tr => ({ name: tr.dataset.name, fileId: tr.dataset.fileId, episode: Number(tr.querySelector('input[type=number]').value) }));
       const meta = { ...metadata(), season: Number(metadata().season), episode: Number(metadata().episode) };
-      confirmed = C.validateMap(files, rows, selectedFile(), meta);
+      const currentRows = rows.filter(row => row.episode === meta.episode);
+      if (currentRows.length !== 1) {
+        status(() => t('请为当前第 {n} 集勾选一个文件；同一集只能选择一份。', { n: meta.episode }), true); return;
+      }
+      const target = files.find(f => f.name === currentRows[0].name && (f.fileId || '') === currentRows[0].fileId);
+      const mapping = C.validateMap(files, rows, target, meta);
+      setFiles(files, { mapping, revision: 'pending', label: target.name, season: meta.season }, target);
+      confirmed = mapping;
       const n = confirmed.length; ui(el('mapInfo'), () => t('· 已确认 {n} 集', { n }));
-      status(() => t('集数对应已确认，加载并勾选跟随后保存。'));
+      status(() => t('集数对应已确认，已选择第 {n} 集。请下载预览，加载并勾选跟随后保存。', { n: meta.episode }));
     }));
     el('resetMap').addEventListener('click', () => renderMap());
     el('versions').addEventListener('change', () => renderFiles());

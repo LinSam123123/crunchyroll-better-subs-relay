@@ -143,7 +143,18 @@
     const list = Array.isArray(value.filelist) && value.filelist.length
       ? value.filelist.map(f => ({ name: clean(f.f, 700), size: clean(String(f.s ?? ''), 60), url: f.url }))
       : [{ name: clean(value.filename || value.sub_name, 700), size: clean(String(value.size ?? ''), 60), url: value.url }];
-    return list.slice(0, 500).map(f => ({ ...f, format: format(f.name), oversized: oversized(f.size) })).filter(f => f.name);
+    return list.slice(0, 500).map(f => {
+      let fileId = '';
+      if (list.filter(other => other.name === f.name).length > 1) {
+        try {
+          const url = new URL(f.url);
+          const part = url.pathname.match(/^\/onthefly\/(\d{1,12})\/[^/]+\/(\d{1,12})\//);
+          if (/^file\d*\.assrt\.net$/i.test(url.hostname) && part &&
+              String(value.id ?? value.fileid) === part[1]) fileId = `assrt:${part[1]}:${part[2]}`;
+        } catch (_) { /* Ambiguous names without a stable source ID remain unselectable. */ }
+      }
+      return { ...f, fileId, format: format(f.name), oversized: oversized(f.size) };
+    }).filter(f => f.name);
   }
   function decode(bytes, encoding = 'auto') {
     if (!['auto', 'utf-8', 'gb18030', 'big5', 'shift_jis', 'utf-16le', 'utf-16be'].includes(encoding)) fail('ASSRT_INVALID_ENCODING');
@@ -159,8 +170,8 @@
     try { return { text: new TextDecoder(selected, { fatal: true }).decode(bytes), encoding: selected }; }
     catch (_) { fail('ASSRT_DECODE_FAILED'); }
   }
-  async function download(value, filename, encoding = 'auto', fetcher = fetch, allowHttp = false) {
-    const matches = files(value).filter(f => f.name === filename);
+  async function download(value, filename, encoding = 'auto', fetcher = fetch, allowHttp = false, fileId = '') {
+    const matches = files(value).filter(f => f.name === filename && (!fileId || f.fileId === fileId));
     if (matches.length !== 1) fail('ASSRT_FILE_CHANGED');
     const file = matches[0];
     if (!file.format) fail('ASSRT_UNSUPPORTED_FILE');
@@ -185,7 +196,7 @@
           // A HTML error page must not enter the subtitle parser as if it were a file.
           const result = decode(bytes, encoding);
           if (/^\s*(?:<!doctype html|<html|<head)/i.test(result.text)) fail('ASSRT_INVALID_FILE');
-          return { name: file.name, format: file.format, bytes: bytes.length, ...result };
+          return { name: file.name, fileId: file.fileId, format: file.format, bytes: bytes.length, ...result };
         } catch (error) {
           if (netError && !/^ASSRT_/.test(error?.message || '') && !['TimeoutError', 'AbortError'].includes(error?.name))
             fail(`ASSRT_DOWNLOAD_${netError}`);

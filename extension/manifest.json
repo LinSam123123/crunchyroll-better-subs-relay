@@ -43,7 +43,7 @@
    "options_page": "translation.html",
    "optional_host_permissions": [ "https://*/*", "http://*.assrt.net/*", "http://localhost/*", "http://127.0.0.1/*" ],
    "permissions": [ "storage", "webRequest" ],
-   "version": "2.7.0.35",
+   "version": "2.7.0.36",
    "version_name": "2.7.0 + Relay 34 Beta",
    "web_accessible_resources": [ {
       "matches": [ "*://www.crunchyroll.com/*" ],

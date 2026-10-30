@@ -330,5 +330,13 @@
     "未授予网络权限，Token 未保存。": {"en":"Network permission not granted; token not saved.","ja":"ネットワーク権限が許可されず、トークンは保存していません。","zh-Hant":"未授予網絡權限，Token 未保存。"},
     "网络连接失败，未自动重试。": {"en":"Network connection failed; no automatic retry.","ja":"ネットワーク接続に失敗しました。自動再試行はしません。","zh-Hant":"網絡連接失敗，未自動重試。"},
     "请求超时，未自动重试。": {"en":"Request timed out; no automatic retry.","ja":"リクエストがタイムアウトしました。自動再試行はしません。","zh-Hant":"請求超時，未自動重試。"},
+    "来源编号 {id}": {"en":"Source file ID {id}","ja":"配布元ファイル ID {id}","zh-Hant":"來源編號 {id}"},
+    "同名文件": {"en":"Same-name file","ja":"同名ファイル","zh-Hant":"同名檔案"},
+    "同名字幕有多个版本。请先确认集数对应，再启用跟随；仅加载当前集可取消跟随。": {"en":"These same-name subtitles have multiple versions. Confirm the episode mapping before following, or disable following to load only this episode.","ja":"同名の字幕に複数の版があります。追従する前に各話の対応を確定してください。現在の話だけ読み込む場合は追従をオフにできます。","zh-Hant":"同名字幕有多個版本。請先確認集數對應，再啟用跟隨；僅載入目前集數可取消跟隨。"},
+    "已确认的文件组": {"en":"Confirmed file set","ja":"確定したファイル群","zh-Hant":"已確認的檔案組"},
+    "{n} 字节": {"en":"{n} bytes","ja":"{n} バイト","zh-Hant":"{n} 位元組"},
+    "大小未知": {"en":"Unknown size","ja":"サイズ不明","zh-Hant":"大小未知"},
+    "请为当前第 {n} 集勾选一个文件；同一集只能选择一份。": {"en":"Select one file for the current episode {n}; only one file per episode is allowed.","ja":"現在の第 {n} 話のファイルを1つ選択してください。各話につき1つだけ選択できます。","zh-Hant":"請為目前第 {n} 集勾選一個檔案；同一集只能選擇一份。"},
+    "集数对应已确认，已选择第 {n} 集。请下载预览，加载并勾选跟随后保存。": {"en":"Mapping confirmed; episode {n} selected. Download a preview, then load with following enabled to save.","ja":"対応を確定し、第 {n} 話を選択しました。プレビューをダウンロードし、追従を有効にして読み込むと保存されます。","zh-Hant":"集數對應已確認，已選擇第 {n} 集。請下載預覽，載入並勾選跟隨後儲存。"},
   });
 })();
