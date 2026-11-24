@@ -335,7 +335,12 @@
   const TOGGLE_TOKEN = Math.random().toString(36).slice(2);
   document.documentElement.setAttribute(PROTOCOL.ATTR.TOGGLE_TOKEN, TOGGLE_TOKEN);
 
-  const PLAYBACK_RE    = /\/playback\/v3\/([^/]+)\/web\/[^/]+\/play(?:[/?#]|$)/;
+  // Match /playback/v3, /playback/v4, and future versions (+ query strings like ?locale=zh-TW).
+  const PLAYBACK_RE        = /\/playback\/(v\d+)\/([^/?#]+)\/web\/[^/?#]+\/play(?:[/?#]|$)/;
+  const CR_PLAY_SERVICE_RE = /^\/v\d+\/([^/?#]+)\/web\/[^/?#]+\/play(?:[/?#]|$)/;
+  let _lastPlaybackVer     = 'v4';
+  const playbackPlayUrl    = (guid, ver = _lastPlaybackVer) =>
+    `https://www.crunchyroll.com/playback/${ver}/${guid}/web/chrome/play`;
   const MANIFEST_RE    = /\/dash\/manifest\.mpd/;
   const LOG            = '[CR Sub Fix]';
   const BTN_ID           = 'cr-jp-cc-btn';
@@ -369,6 +374,7 @@
     'ms-MY': 'Bahasa Melayu',     'th-TH': 'ภาษาไทย',
     'id-ID': 'Bahasa Indonesia',  'vi-VN': 'Tiếng Việt',
     'te-IN': 'తెలుగు',            // seen live 2026-08 (Telugu dub sessions)
+    'ta-IN': 'தமிழ்',             // seen live 2026-09 (Tamil dub)
   };
   // Short 2-char labels shown on the toggle button while a source is active
   const LOCALE_SHORT = {
@@ -380,7 +386,7 @@
     'pl-PL':'PL','tr-TR':'TR','nl-NL':'NL','fi-FI':'FI',
     'sv-SE':'SV','nb-NO':'NO','da-DK':'DA','cs-CZ':'CS',
     'ro-RO':'RO','hu-HU':'HU','ms-MY':'MS','th-TH':'TH',
-    'id-ID':'ID','vi-VN':'VI','te-IN':'TE',
+    'id-ID':'ID','vi-VN':'VI','te-IN':'TE','ta-IN':'TA',
   };
 
   const originalFetch = window.fetch.bind(window);
@@ -393,6 +399,8 @@
   let videoEl            = null;
   let overlayActive      = false;
   let clickInProgress    = false;
+  let _activateSeq       = 0;
+  let manualSourceEpoch  = 0;
   let buttonInControls   = false;
   let movedToControls    = false;
 
@@ -447,8 +455,9 @@
     getEpisode:      () => currentEp(),
     isOverlayActive: () => overlayActive,
     localeLabels:    LOCALE_LABELS,
-    onSelectLocale:  (locale) => selectSource(locale),
+    onSelectLocale:  (locale) => { manualSourceEpoch++; selectSource(locale); },
     onSelectCustom:  (id)     => {
+      manualSourceEpoch++;
       selectSource(id);
       const ep = currentEp(), record = ep?.getCustomSource(id);
       if (record?.kind === 'external') rpc('external-active', { guid: ep.guid, id, lang: record.lang || '', sync: record.sync })
@@ -456,7 +465,7 @@
     },
     // Dual subtitles: pick / clear the secondary track (persisted across episodes).
     onSelectSecondary: (locale) => selectSecondary(locale),
-    getSecondary:      ()       => getSecondaryPref(),
+    getSecondary:      ()       => { const ep = currentEp(); return ep ? resolveEffectiveSecondary(ep) : getSecondaryPref(); },
     // Learning mode: the guided "match the audio + your language" stack.  The
     // menu hands back the locale to use as the support ("native") track; we set
     // the audio-matched primary + that secondary (see applyLearningMode).
@@ -475,10 +484,17 @@
       name === 'dialogue' ? !!isShowDialogue()
       : name === 'signs'  ? !!isShowSigns()
       : name === 'official' ? !isHideOfficialSubs()
+      : name === 'auto' ? !!isAutoActivate()
+      : name === 'autoTranslate' ? !!isMtAutoTranslate()
       : true,
     onSetLayer: (name, on) => {
       if (name === 'dialogue')      saveSetting('showDialogue', !!on);
       else if (name === 'signs')    saveSetting('showSigns', !!on);
+      else if (name === 'auto')     saveSetting('autoActivate', !!on);
+      else if (name === 'autoTranslate') {
+        saveSetting('mtAutoTranslate', !!on);
+        if (on) scheduleAutoTranslate();
+      }
       else if (name === 'official') {
         saveSetting('hideOfficialSubs', !on);
         // Burned-in (hardsub) streams can only change on a fresh playback
@@ -520,6 +536,7 @@
     // to drop all machine-translated tracks for this episode.
     getClearMtAction: () => (isMtEnabled() && isMtConfigured()) ? { label: '🗑 Clear machine translations' } : null,
     onTurnOff: () => {
+      manualSourceEpoch++;
       const ep = currentEp();
       if (ep) rpc('external-active', { guid: ep.guid, id: '' });
       setPendingActivate(false); // user explicitly said off — drop any queued click
@@ -548,6 +565,7 @@
     if (isCustomId(locale)) return ep.getCustomSource(locale) ? true : false;
     if (locale === 'ja-JP') {
       if (ep.jpCaptionUrl || ep.jpSubtitleUrl) return true;
+      if (ep.catalog.entries?.().some(([s]) => s === 'ja-JP')) return false;
       return ep.jpGuid ? null : false;
     }
     return ep.catalog.availability(locale);
@@ -703,6 +721,7 @@
     sourceMenu.updateButtonVisibility();
     if (activate) {
       if (revision !== externalChoiceRevision) return;
+      if (typeof cancelTranslate === 'function') cancelTranslate();
       const button = document.getElementById(BTN_ID);
       if (button && ['reload', 'unavail'].includes(button.dataset.state)) setButtonState(button, 'idle');
       selectSource(record.id, true);
@@ -724,13 +743,15 @@
     let state = externalRestores.get(ep);
     if (!state) {
       state = { originalSource: ep.activeSource(), revision: externalChoiceRevision,
-        request: rpc('external-restore', { guid: ep.guid }, 120000), installation: null, reported: false };
+        request: rpc('external-restore', { guid: ep.guid }, 120000), installation: null, reported: false,
+        settled: false, result: null };
       externalRestores.set(ep, state);
     }
     if (state.installation) return state.installation;
     const { originalSource, revision } = state;
     state.installation = (async () => {
       const result = await state.request;
+      state.result = result;
       if (currentEp() !== ep || revision !== externalChoiceRevision) return;
       if (result?.ok === false && !state.reported) {
         state.reported = true;
@@ -752,11 +773,16 @@
           await installExternal(result.record, result.active !== false, revision);
         }
       }
-    })().finally(() => { state.installation = null; });
+    })().finally(() => {
+      state.settled = true;
+      state.installation = null;
+      if (typeof scheduleAutoTranslate === 'function') scheduleAutoTranslate(ep);
+    });
     return state.installation;
   }
   function handleManualSubtitleClick(btn) {
     externalChoiceRevision++;
+    if (overlayActive) manualSourceEpoch++;
     const ep = currentEp();
     if (ep && currentCustomSource()?.kind !== 'external') rpc('external-active', { guid: ep.guid, id: '' }).catch(() => {});
     return handleButtonClick(btn);
@@ -765,6 +791,7 @@
     const d = event.data;
     if (event.source !== window || d?.type !== PROTOCOL.POST.EXTERNAL_APPLY || d.token !== TOGGLE_TOKEN) return;
     externalChoiceRevision++;
+    manualSourceEpoch++;
     const ep = currentEp();
     if (ep && ep.guid === d.payload?.guid) externalRestores.set(ep, {
       originalSource: ep.activeSource(), revision: externalChoiceRevision,
@@ -792,6 +819,8 @@
     }
     setPendingActivate(false); // explicit selection supersedes any queued click
     if (queueResolverTimer) { clearTimeout(queueResolverTimer); queueResolverTimer = null; }
+    _activateSeq++;
+    clickInProgress = false;
     if (overlayActive) {
       setOverlayActive(false);
       stopSync();
@@ -803,7 +832,9 @@
     cur.clearCues();
     renderer.invalidate();
     const btn = document.getElementById(BTN_ID);
-    if (btn) handleButtonClick(btn).catch(() => {});
+    if (btn) handleButtonClick(btn).then(() => {
+      if (!cur.disposed && cur === currentEp() && overlayActive) cur.markAutoActivated();
+    }).catch(() => {});
   }
 
   // ── Load a local subtitle file ────────────────────────────────────────────
@@ -844,6 +875,8 @@
       return;
     }
     log.info(`Loaded local subtitle file [${file.name}] — ${record.srcCues.length} cues.`);
+    manualSourceEpoch++;
+    cancelTranslate();
     ep.addCustomSource(record);
     sourceMenu.updateButtonVisibility();
     // force=true: re-uploading replaces the same 'custom:local' slot, so the id
@@ -865,7 +898,11 @@
     // If it was the second subtitle, drop that too — the band must not keep
     // rendering a deleted record, and the persisted pref would go phantom on
     // the next episode.
-    if (getSecondaryPref() === id) selectSecondary('');
+    if (getSecondaryPrefRaw() === id) {
+      try { localStorage.removeItem(SECONDARY_PREF_KEY); } catch (_) {}
+      _secState = { guid: null, want: null, primary: null };
+      maybeLoadSecondary(ep);
+    }
     if (wasActive) {
       if (overlayActive) { setOverlayActive(false); stopSync(); }
       ep.setActiveSource(null);
@@ -1717,8 +1754,8 @@
         (checkpoint.workToken || '') !== workToken || checkpoint.epoch !== mtProgressEpoch)) {
       throw new Error('RESUME_CONTEXT_CHANGED');
     }
-    const tLabel   = mtLangLabel(target);
-    const pLabel   = MT_PROVIDER_LABELS[provider] ?? provider;
+    const tLabel   = t(mtLangLabel(target));
+    const pLabel   = t(MT_PROVIDER_LABELS[provider] ?? provider);
 
     const source = (opts && opts.source) || pickMtSourceLocale(ep, target);
     if (!source) throw new Error('SOURCE_TRACK_UNAVAILABLE');
@@ -1820,6 +1857,15 @@
       baseRawAss, signsBase, signParse, out, persisted, epoch: mtProgressEpoch };
     hud.setResume(() => translateToTarget({ target, provider, source, batchSize: TUNE.batch, checkpoint: resume }));
     const initialSource = ep.activeSource();
+    const startManualEpoch = typeof manualSourceEpoch === 'number' ? manualSourceEpoch : null;
+    const shouldAutoSelectMt = () => {
+      const cur = ep.activeSource();
+      if (cur === initialSource) return true;
+      if (typeof manualSourceEpoch === 'number' && manualSourceEpoch === startManualEpoch) {
+        return !cur || cur === id || typeof isCustomId !== 'function' || !isCustomId(cur);
+      }
+      return false;
+    };
     let published = false;
     function publish() {
       if (stopped() || !done) return;
@@ -1832,12 +1878,17 @@
       }), incomplete: true, reviewCacheKey: partKey, sync: previous?.sync || { mode: 'none' } };
       ep.addCustomSource(record);
       sourceMenu.updateButtonVisibility();
-      if (!published && ep.activeSource() === initialSource) selectSource(id);
-      else if (ep.activeSource() === id && overlayActive) {
-        ep.setOriginalCues(applyCustomSync(record));
-        if (record.signRawAss !== previous?.signRawAss) setSignSource(record.signRawAss);
-        renderer.invalidate();
-        onTimeUpdate();
+      if (!published && ep.activeSource() !== id && shouldAutoSelectMt()) selectSource(id);
+      else if (ep.activeSource() === id) {
+        if (overlayActive) {
+          ep.setOriginalCues(applyCustomSync(record));
+          if (record.signRawAss !== previous?.signRawAss) setSignSource(record.signRawAss);
+          renderer.invalidate();
+          onTimeUpdate();
+        } else if (typeof clickInProgress !== 'undefined' && !clickInProgress && typeof handleButtonClick === 'function') {
+          const b = document.getElementById(BTN_ID);
+          if (b) handleButtonClick(b).catch(() => {});
+        }
       }
       published = true;
     }
@@ -1997,7 +2048,9 @@
     hud.fade();
     hideTranslateProgress();
     log.info(`Machine-translated ${cues.length} cues ${source} → ${target} (resumed ${resumed}).`);
-    if (ep.activeSource() === id) {
+    if (!published && ep.activeSource() !== id && shouldAutoSelectMt()) {
+      selectSource(id, true);
+    } else if (ep.activeSource() === id) {
       ep.setOriginalCues(applyCustomSync(ep.getCustomSource(id)));
       renderer.invalidate();
       onTimeUpdate();
@@ -2510,9 +2563,21 @@
   // Schema lives in lib/settings-schema.js.
   const html = document.documentElement;
 
+  const readMirroredBool = (mirrorKey, schemaKey) => {
+    const entry = SETTINGS.SCHEMA.find(s => s.key === schemaKey);
+    const raw = entry ? html.getAttribute(entry.attr) : null;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    try {
+      const m = localStorage.getItem(mirrorKey);
+      if (m === '1') return true;
+      if (m === '0') return false;
+    } catch (_) {}
+    return SETTINGS.read(html, schemaKey);
+  };
   const isEnabled              = () => SETTINGS.read(html, 'enabled');
-  const isAutoActivate         = () => SETTINGS.read(html, 'autoActivate');
-  const isHideOfficialSubs     = () => SETTINGS.read(html, 'hideOfficialSubs');
+  const isAutoActivate         = () => readMirroredBool('crSubFix_mirror_autoActivate', 'autoActivate');
+  const isHideOfficialSubs     = () => readMirroredBool('crSubFix_mirror_hideOfficial', 'hideOfficialSubs');
   const getSubScale            = () => SETTINGS.read(html, 'subScale');
   const getSyncOffset          = () => SETTINGS.read(html, 'subOffset');
   const getSubBottomFloor      = () => SETTINGS.read(html, 'subBottomFloor');
@@ -2563,6 +2628,12 @@
   // first — CR's hydration can strip it, which would make content.js reject this.
   function saveSetting(key, value) {
     try { SETTINGS.write(html, key, value); } catch (_) {}
+    if (key === 'hideOfficialSubs' || key === 'autoActivate') {
+      try {
+        localStorage.setItem(key === 'hideOfficialSubs' ? 'crSubFix_mirror_hideOfficial' : 'crSubFix_mirror_autoActivate',
+          (value === true || value === 'true') ? '1' : '0');
+      } catch (_) {}
+    }
     try { html.setAttribute(PROTOCOL.ATTR.TOGGLE_TOKEN, TOGGLE_TOKEN); } catch (_) {}
     try { window.postMessage({ type: PROTOCOL.POST.SET_SETTING, token: TOGGLE_TOKEN, key, value }, window.location.origin); } catch (_) {}
   }
@@ -2574,31 +2645,42 @@
   // in the popup — Chrome only lets an extension PAGE request the host
   // permission, and a provider is paired with its key.)
   const getMtTarget = () => {
+    if (typeof html?.hasAttribute === 'function' && html.hasAttribute('data-cr-mt-target')) {
+      return SETTINGS.read(html, 'mtTarget') || 'zh-CN';
+    }
     try { const v = localStorage.getItem('crSubFix_mt_target'); if (v) return v; } catch (_) {}
     return SETTINGS.read(html, 'mtTarget') || 'zh-CN';
   };
   const getMtSourcePref = () => {
+    if (typeof html?.hasAttribute === 'function' && html.hasAttribute('data-cr-mt-source')) {
+      return SETTINGS.read(html, 'mtSource') || '';
+    }
     try { const v = localStorage.getItem('crSubFix_mt_source'); if (v != null) return v; } catch (_) {}
     return SETTINGS.read(html, 'mtSource') || '';
   };
-  const setMtPref = (key, val) => { try { localStorage.setItem('crSubFix_mt_' + key, val); } catch (_) {} };
+  const setMtPref = (key, val) => {
+    try { localStorage.setItem('crSubFix_mt_' + key, val); } catch (_) {}
+    saveSetting(key === 'target' ? 'mtTarget' : 'mtSource', val);
+  };
   const isMtEnabled            = () => SETTINGS.read(html, 'mtEnabled');
+  const isMtAutoTranslate      = () => SETTINGS.read(html, 'mtAutoTranslate');
   const isMtConfigured         = () => html.getAttribute(PROTOCOL.ATTR.MT_CONFIGURED) === 'true';
   // Display names for MT TARGET languages.  Deliberately NOT LOCALE_LABELS —
   // that maps 'ja-JP' to "English (Japanese source)" (the CR dub-context label),
   // which is nonsense for a translation target.  These are real language names.
   const MT_LANG_LABELS = {
     'ja-JP': 'Japanese',  'ko-KR': 'Korean',          'zh-CN': 'Chinese (Simplified)',
-    'zh-TW': 'Chinese (Traditional)', 'en-US': 'English', 'de-DE': 'Deutsch',
+    'zh-TW': 'Chinese (Traditional)', 'en-US': 'English', 'en-GB': 'English (UK)', 'de-DE': 'Deutsch',
     'es-419': 'Español (Lat)', 'es-ES': 'Español (España)', 'fr-FR': 'Français',
-    'pt-BR': 'Português (BR)', 'it-IT': 'Italiano',    'ru-RU': 'Русский',
+    'pt-BR': 'Português (BR)', 'pt-PT': 'Português (PT)', 'it-IT': 'Italiano',    'ru-RU': 'Русский',
   };
   const mtLangLabel = (loc) => MT_LANG_LABELS[loc] ?? LOCALE_LABELS[loc] ?? loc;
   // Ordered target options for the in-player Translate panel.
   const MT_TARGET_OPTIONS = [
-    ['ja-JP', 'Japanese'], ['ko-KR', 'Korean'], ['zh-CN', 'Chinese (Simplified)'],
-    ['zh-TW', 'Chinese (Traditional)'], ['en-US', 'English'], ['de-DE', 'Deutsch'],
-    ['es-419', 'Español (Lat)'], ['fr-FR', 'Français'], ['pt-BR', 'Português (BR)'],
+    ['zh-CN', 'Chinese (Simplified)'], ['zh-TW', 'Chinese (Traditional)'],
+    ['en-US', 'English'], ['en-GB', 'English (UK)'], ['ja-JP', 'Japanese'], ['ko-KR', 'Korean'],
+    ['de-DE', 'Deutsch'], ['es-419', 'Español (Lat)'], ['es-ES', 'Español (España)'],
+    ['fr-FR', 'Français'], ['pt-BR', 'Português (BR)'], ['pt-PT', 'Português (PT)'],
     ['it-IT', 'Italiano'], ['ru-RU', 'Русский'],
   ];
   const getMtProvider = () => SETTINGS.read(html, 'mtProvider') || 'relay';
@@ -2709,6 +2791,7 @@
     // Through the wrapper so content.js gets a SIGN_ASS clear — a bare write
     // leaves libass rendering the outgoing episode's typeset signs.
     setOverlayActive(false);
+    _activateSeq++;
     clickInProgress  = false;
     videoEl          = null;
     buttonInControls = false;
@@ -2718,6 +2801,7 @@
     pendingActivate   = false;
     if (queueResolverTimer) { clearTimeout(queueResolverTimer); queueResolverTimer = null; }
     clearTimeout(settleTimer); settleTimer = null;
+    clearTimeout(_autoTranslateTimer); _autoTranslateTimer = null;
     sourceMenu.close();
     closeExportPanel();
     closeSyncPanel();
@@ -2934,10 +3018,16 @@
     // hadn't been written yet when JP data first landed), give it another
     // shot now that the attribute reflects the real setting.
     tryAutoActivate();
+    const curEp = currentEp();
+    if (curEp && curEp._autoTranslatedTarget && curEp._autoTranslatedTarget !== getMtTarget()) {
+      cancelTranslate();
+      curEp._autoTranslateHandled = false;
+    }
+    scheduleAutoTranslate();
     // Pick up live changes to "hide official subs" (and the master enable
     // toggle) without waiting for the overlay to be touched.
     syncSubSuppression();
-  }).observe(html, { attributes: true, attributeFilter: SETTINGS.ATTRS });
+  }).observe(html, { attributes: true, attributeFilter: SETTINGS.ATTRS.concat([PROTOCOL.ATTR.MT_CONFIGURED]) });
 
   // Called from the playback / JP-first / prefetch success paths after JP
   // data lands.  Does two things:
@@ -3011,7 +3101,7 @@
       log.info(`Queue resolver: self-triggering playback fetch for ${ep.guid}.`);
       try {
         await window.fetch(
-          `https://www.crunchyroll.com/playback/v3/${ep.guid}/web/chrome/play`,
+          playbackPlayUrl(ep.guid),
           { credentials: 'include', headers: auth }
         );
       } catch (err) {
@@ -3030,7 +3120,8 @@
     }
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
-    if (!ep.jpCaptionUrl && !ep.jpSubtitleUrl) {
+    const jpLoadedNoEn = ep.catalog.entries().some(([s, row]) => s === 'ja-JP' && Object.keys(row).length > 0);
+    if (!ep.jpCaptionUrl && !ep.jpSubtitleUrl && !jpLoadedNoEn) {
       // No JP URLs loaded yet — but if a guid mapping exists (carried across a
       // dub switch, or cached from a prior visit) and we can actually fetch it
       // (cached → no auth needed, or we have captured auth for a live fetch),
@@ -3060,22 +3151,36 @@
     // Ready cue: show 'loading' before activating so the flash fires even when JP
     // is already loaded (the min-duration wrapper holds it briefly, then '✓').
     if (btn.dataset.state === 'idle') setButtonState(btn, 'loading');
-    // Restore the last-used subtitle locale, but only if it is actually available
-    // for this episode.  A saved locale from a different episode (e.g. ca-ES that
-    // only some shows carry) must not be applied here — fall back to default JP.
-    try {
-      const saved = localStorage.getItem(LOCALE_PREF_KEY);
-      if (saved && saved !== ep.activeSource()) {
-        const avail = localeHasContent(saved);
-        if (avail !== false) {          // true (ready) or null (fetchable) — proceed
-          ep.setActiveSource(saved);
-          ep.clearCues();
-          renderer.invalidate();
+    if (isCustomId(ep.activeSource())) {
+      // Keep active external/local/MT track; never clobber it with LOCALE_PREF_KEY.
+    } else {
+      let preferred = null;
+      if (isMtEnabled() && isMtAutoTranslate()) {
+        const target = getMtTarget();
+        const mtRec = target
+          ? (ep.listCustomSources?.() ?? []).find(s => s.kind === 'mt' && s.lang === target)
+          : null;
+        if (mtRec) {
+          preferred = mtRec.id;
         } else {
-          localStorage.removeItem(LOCALE_PREF_KEY);
+          const official = resolveOfficialTargetLocale(ep, target);
+          if (official) preferred = official;
         }
       }
-    } catch (_) {}
+      try {
+        const saved = preferred || localStorage.getItem(LOCALE_PREF_KEY);
+        if (saved && saved !== ep.activeSource()) {
+          const avail = localeHasContent(saved);
+          if (avail !== false) {          // true (ready) or null (fetchable) — proceed
+            ep.setActiveSource(saved);
+            ep.clearCues();
+            renderer.invalidate();
+          } else if (!preferred) {
+            localStorage.removeItem(LOCALE_PREF_KEY);
+          }
+        }
+      } catch (_) {}
+    }
     // Mark only on actual activation success.  Marking optimistically before
     // the click resolved meant a failed/raced activation would still latch
     // autoActivatedFor — and subsequent dub switches would silently bail
@@ -3083,6 +3188,66 @@
     handleButtonClick(btn).then(() => {
       if (!ep.disposed && overlayActive) ep.markAutoActivated();
     }).catch(() => {});
+  }
+
+  let _autoTranslateTimer = null;
+  function resolveOfficialTargetLocale(ep, target) {
+    if (!ep || !target || target === 'ja-JP') return null;
+    if (localeHasContent(target) === true) return target;
+    if (target === 'en-US' && localeHasContent('ja-JP') === true) return 'ja-JP';
+    return null;
+  }
+  function scheduleAutoTranslate(ep = currentEp()) {
+    if (!ep || ep.disposed) return;
+    clearTimeout(_autoTranslateTimer);
+    _autoTranslateTimer = setTimeout(() => {
+      _autoTranslateTimer = null;
+      maybeStartAutoTranslate(ep);
+    }, 80);
+  }
+
+  function maybeStartAutoTranslate(ep = currentEp()) {
+    if (!ep || ep.disposed || ep !== currentEp()) return;
+    if (!isEnabled() || !isMtEnabled() || !isMtConfigured() || !isMtAutoTranslate()) return;
+    if (_translating || ep._autoTranslateHandled) return;
+    if ((ep.listCustomSources?.() ?? []).some(s => s.kind === 'external' || s.kind === 'local' || s.kind === 'mt')) {
+      ep._autoTranslateHandled = true;
+      return;
+    }
+    const ext = externalRestores.get(ep);
+    if (!ext) {
+      restoreExternal(ep).catch(() => {});
+      return;
+    }
+    if (!ext.settled) return;
+    const res = ext.result;
+    if (res?.ok === false || (res?.record && res.active !== false) || res?.followError || res?.hasFollowRule) {
+      ep._autoTranslateHandled = true;
+      return;
+    }
+    const target = getMtTarget();
+    const officialTarget = resolveOfficialTargetLocale(ep, target);
+    if (officialTarget) {
+      ep._autoTranslateHandled = true;
+      ep._autoTranslatedTarget = target;
+      if (ep.activeSource() !== officialTarget || !overlayActive) selectSource(officialTarget);
+      return;
+    }
+    const source = pickMtSourceLocale(ep, target);
+    if (!source) return;
+    if (source === 'ja-JP') {
+      const hasJpUrl = !!(ep.jpCaptionUrl || ep.jpSubtitleUrl);
+      const jpGuid = ep.jpGuid ?? ep.getMappedJpGuid?.();
+      const hasAuth = !!(ep.authHeaders && Object.keys(ep.authHeaders).length) || !!(ep.capturedAuth && Object.keys(ep.capturedAuth).length);
+      if (!hasJpUrl && (!jpGuid || (!ep.getCachedJpData?.(jpGuid) && !hasAuth))) return;
+    } else if (localeHasContent(source) === false) {
+      return;
+    }
+    if (typeof document !== 'undefined' && !document.getElementById(BTN_ID)) return;
+    ep._autoTranslateHandled = true;
+    ep._autoTranslatedTarget = target;
+    log.info(`Auto-translating (no external subtitles): source=${source} target=${target}`);
+    translateToTarget().catch(() => {});
   }
 
   // ── Pre-fetch JP data ──────────────────────────────────────────────────────
@@ -3133,6 +3298,7 @@
         log.info('JP pre-loaded. Caption:', ep.jpCaptionUrl, '| Sub:', ep.jpSubtitleUrl);
         loaded = true;
         tryAutoActivate();
+        scheduleAutoTranslate(ep);
         onJpDataReady();
         backgroundValidateAll().catch(() => {});
       } else {
@@ -3184,10 +3350,16 @@
     // the button-click latch (clickInProgress) and the translate HUD.
     let data;
     try {
-      const resp = await originalFetch(
-        `https://www.crunchyroll.com/playback/v3/${jpGuid}/web/chrome/play`,
+      let resp = await originalFetch(
+        playbackPlayUrl(jpGuid),
         { credentials: 'include', headers: authHeaders }
       );
+      if (!resp.ok && resp.status === 404 && _lastPlaybackVer !== 'v3') {
+        resp = await originalFetch(
+          playbackPlayUrl(jpGuid, 'v3'),
+          { credentials: 'include', headers: authHeaders }
+        );
+      }
 
       if (!resp.ok) {
         log.warn(`JP session fetch failed (${resp.status}).`);
@@ -3230,10 +3402,16 @@
     // throw would abort validation for every other locale.  Map any throw to a
     // soft fetchFailed instead.
     try {
-      const resp = await originalFetch(
-        `https://www.crunchyroll.com/playback/v3/${guid}/web/chrome/play`,
+      let resp = await originalFetch(
+        playbackPlayUrl(guid),
         { credentials: 'include', headers: authHeaders }
       );
+      if (!resp.ok && resp.status === 404 && _lastPlaybackVer !== 'v3') {
+        resp = await originalFetch(
+          playbackPlayUrl(guid, 'v3'),
+          { credentials: 'include', headers: authHeaders }
+        );
+      }
 
       if (!resp.ok) {
         const rateLimited = resp.status === 429 || resp.status === 420;
@@ -3310,7 +3488,7 @@
   // Whether that track actually carries \pos typeset signs — CR ships some
   // locales dialogue-only, in which case "Secondary"/"Both" have nothing to show.
   let _secondaryHasSigns = false;
-  const isLibassSigns = () => { try { return localStorage.getItem('crSubFix_libass') !== '0'; } catch (_) { return true; } };
+  const isLibassSigns = () => { try { return localStorage.getItem('crSubFix_libass') === '1'; } catch (_) { return false; } };
 
   // CJK detection (Hangul / Kana / CJK ideographs) — mirrors content.js.  libass
   // only has our bundled fonts, so CJK signs (e.g. machine-translated Simplified
@@ -3455,9 +3633,65 @@
   // primary), or the dub's own CC for a same-language pick (natively timed to
   // the playing cut) — no remaster either way.
   const SECONDARY_PREF_KEY = 'crSubFix_secondary';
-  const getSecondaryPref = () => { try { return localStorage.getItem(SECONDARY_PREF_KEY) || ''; } catch (_) { return ''; } };
+  const getSecondaryPrefRaw = () => { try { return localStorage.getItem(SECONDARY_PREF_KEY) || ''; } catch (_) { return ''; } };
+  const getSecondaryPref = () => {
+    const raw = getSecondaryPrefRaw();
+    return (raw === 'none' || raw === 'auto') ? '' : raw;
+  };
   function setSecondaryPref(loc) {
-    try { if (loc) localStorage.setItem(SECONDARY_PREF_KEY, loc); else localStorage.removeItem(SECONDARY_PREF_KEY); } catch (_) {}
+    try { localStorage.setItem(SECONDARY_PREF_KEY, loc || 'none'); } catch (_) {}
+  }
+  function isBilingualCues(cues) {
+    if (!Array.isArray(cues) || !cues.length) return false;
+    const dlg = [];
+    for (let i = 0; i < cues.length && dlg.length < 160; i++) {
+      if (!cues[i].pos && cues[i].text) dlg.push(cues[i]);
+    }
+    let cjkCount = 0, bilingualCount = 0;
+    for (let i = 0; i < dlg.length; i++) {
+      const c = dlg[i];
+      if (!hasCJK(c.text)) continue;
+      cjkCount++;
+      if (/[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(c.text)) {
+        bilingualCount++;
+        continue;
+      }
+      for (let j = Math.max(0, i - 4); j <= Math.min(dlg.length - 1, i + 4); j++) {
+        if (j === i) continue;
+        const other = dlg[j];
+        if (Math.abs(other.start - c.start) < 0.25 && !hasCJK(other.text) && /[A-Za-z]{2,}/.test(other.text)) {
+          bilingualCount++;
+          break;
+        }
+      }
+    }
+    return cjkCount > 0 && bilingualCount / cjkCount >= 0.25 && (cjkCount >= 3 || bilingualCount === cjkCount);
+  }
+  function resolveEffectiveSecondary(ep) {
+    if (!ep) return '';
+    const raw = getSecondaryPrefRaw();
+    if (raw === 'none') return '';
+    const pri = ep.activeSource();
+    const customRec = isCustomId(pri) ? ep.getCustomSource?.(pri) : null;
+    if (customRec && customRec.kind !== 'mt') {
+      if (customRec._isBilingual === undefined) customRec._isBilingual = isBilingualCues(customRec.srcCues || []);
+      if (customRec._isBilingual && (!raw || raw === 'auto' || raw === 'ja-JP' || /^en(?:-|$)/i.test(raw))) return '';
+    }
+    if (raw && raw !== 'auto') return raw;
+    if (!pri || pri === 'ja-JP' || /^en(?:-|$)/i.test(pri)) return '';
+    if (isCustomId(pri)) {
+      if (!customRec) return '';
+      if (customRec.kind === 'mt') {
+        if (/^en(?:-|$)/i.test(customRec.lang || '')) return '';
+        if (customRec.mtSource && (customRec.mtSource === 'ja-JP' || /^en(?:-|$)/i.test(customRec.mtSource)) && localeHasSub(ep, customRec.mtSource)) {
+          return customRec.mtSource;
+        }
+      }
+    }
+    for (const loc of ['en-US', 'en-GB', 'ja-JP']) {
+      if (loc !== pri && localeHasSub(ep, loc)) return loc;
+    }
+    return '';
   }
   // Lazily (re)load the secondary track when the pref, the Episode, or the
   // primary source changes.  Cheap no-op once in the desired state.  A secondary
@@ -3478,7 +3712,7 @@
     pushSignLayer();
   }
   function maybeLoadSecondary(ep) {
-    const want    = getSecondaryPref();
+    const want    = resolveEffectiveSecondary(ep);
     // null = the default JP-session source — normalize so `want === primary`
     // catches a 'ja-JP' secondary against the default primary (the menu
     // normalizes the same way when it excludes the primary from the list).
@@ -3519,7 +3753,7 @@
     };
     fetchCuesForLocale(ep, want).then((r) => {
       if (ep.disposed || currentEp() !== ep) return;
-      if (getSecondaryPref() !== want) return;        // changed again mid-fetch
+      if (resolveEffectiveSecondary(ep) !== want) return;        // changed again mid-fetch
       // Primary may have been switched to `want` while the fetch was in
       // flight — committing would double every line, and the memo key would
       // then read as satisfied and never re-evaluate.
@@ -3594,7 +3828,11 @@
   // localeHasContent).
   function localeHasSub(ep, loc) {
     if (!ep || !loc) return false;
-    if (loc === 'ja-JP') return !!(ep.jpCaptionUrl || ep.jpSubtitleUrl || ep.jpGuid);
+    if (loc === 'ja-JP') {
+      if (ep.jpCaptionUrl || ep.jpSubtitleUrl) return true;
+      if (ep.catalog.entries?.().some(([s]) => s === 'ja-JP')) return false;
+      return !!ep.jpGuid;
+    }
     return ep.catalog.availability(loc) !== false;
   }
 
@@ -3620,6 +3858,7 @@
   function applyLearningMode(nativeLocale) {
     const ep = currentEp();
     if (!ep) return;
+    manualSourceEpoch++;
     if (nativeLocale) setNativePref(nativeLocale);
     const native  = nativeLocale || getNativePref();
     const audio   = ep.catalog.currentAudio();
@@ -4131,7 +4370,7 @@
    *   { ok: false, kind: 'empty',        lang }           // parsed 0 cues
    *   { ok: false, kind: 'wrong-title',  lang }           // duration short, no replacement
    */
-  async function loadSubtitleCues(url, lang, ep, onScanning) {
+  async function loadSubtitleCues(url, lang, ep, onScanning, isCancelled) {
     let rawText = ep.getCachedRawText(url);
     if (rawText) {
       log.info('Subtitle text from session cache.');
@@ -4147,7 +4386,7 @@
       ep.setCachedRawText(url, rawText);
     }
 
-    if (ep.disposed || ep !== currentEp()) return { ok: false, kind: 'cancelled', lang };
+    if (ep.disposed || ep !== currentEp() || isCancelled?.()) return { ok: false, kind: 'cancelled', lang };
     let cues = parseSubtitles(rawText, url);
     ep.setOriginalCues(cues);
     setSignSource(rawText);  // hand the \pos typeset signs to libass (no-op for VTT / sign-less)
@@ -4168,7 +4407,7 @@
       onScanning?.(lang);
 
       const replacement = await tryAlternateSession(lang);
-      if (ep.disposed || ep !== currentEp()) return { ok: false, kind: 'cancelled', lang };
+      if (ep.disposed || ep !== currentEp() || isCancelled?.()) return { ok: false, kind: 'cancelled', lang };
       if (replacement) {
         const badUrl = url;
         cues = replacement.cues;
@@ -4231,6 +4470,7 @@
     }
 
     clickInProgress = true;
+    const seq = ++_activateSeq;
     setButtonState(btn, 'loading');
 
     // Determine subtitle URL for the active source.
@@ -4291,7 +4531,7 @@
         const v = catalog.versions().find(v => v.locale === srcLocale);
         if (v?.guid) {
           const result   = await fetchSubUrlForSource(v.guid, srcLocale, ep.authHeaders);
-          if (ep.disposed || ep !== currentEp()) return;
+          if (seq !== _activateSeq || ep.disposed || ep !== currentEp()) return;
           subUrl         = result.url ?? getSubtitleUrl(srcLocale);
           fetchedNativeLocale = subUrl ? srcLocale : null;
           srcFetchFailed      = result.fetchFailed;
@@ -4313,7 +4553,7 @@
       const jpGuidForFetch = ep.jpGuid ?? ep.getMappedJpGuid?.();
       if (!subUrl && jpGuidForFetch && ep.authHeaders) {
         const jpData   = await fetchAndCacheJpData(jpGuidForFetch, ep.authHeaders);
-        if (ep.disposed || ep !== currentEp()) return;
+        if (seq !== _activateSeq || ep.disposed || ep !== currentEp()) return;
         subUrl         = jpData?.captionUrl || jpData?.subtitleUrl || null;
         srcFetchFailed = jpData?.fetchFailed ?? false;
         if (subUrl) {
@@ -4341,12 +4581,20 @@
         handleButtonClick(btn).catch(() => {});
         return;
       } else {
-        // JP subtitles truly unavailable — check if any other session has subtitle data.
+        // JP subtitles truly unavailable — check if any other session/locale has subtitle data.
         let fallbackSession = null, fallbackSubLocale = null;
+        const wantTarget = getMtTarget();
+        const native = getNativePref();
         for (const [sess, row] of catalog.entries()) {
-          if (sess === 'ja-JP') continue;
-          const first = Object.keys(row)[0];
-          if (first) { fallbackSession = sess; fallbackSubLocale = first; break; }
+          for (const loc of Object.keys(row)) {
+            if (loc === 'ja-JP' || !row[loc]) continue;
+            if (!fallbackSubLocale || loc === native || loc === wantTarget) {
+              fallbackSession = sess;
+              fallbackSubLocale = loc;
+            }
+            if (loc === wantTarget) break;
+          }
+          if (fallbackSubLocale === wantTarget) break;
         }
         if (fallbackSubLocale) {
           log.info(`No JP subs — auto-falling back to [${fallbackSubLocale}] from [${fallbackSession}] session.`);
@@ -4392,6 +4640,7 @@
     const lang = srcLocale ?? 'ja-JP';
     try {
       const result = await loadSubtitleCues(subUrl, lang, ep, () => {
+        if (seq !== _activateSeq) return;
         const hud = ensureHud();
         if (hud) {
           hud.html(
@@ -4399,9 +4648,9 @@
             `<span style="color:rgba(255,255,255,0.4);font-size:10px;"> — scanning sessions…</span>`
           );
         }
-      });
+      }, () => seq !== _activateSeq);
 
-      if (ep.disposed || ep !== currentEp()) return;
+      if (seq !== _activateSeq || ep.disposed || ep !== currentEp() || result.kind === 'cancelled') return;
       if (!result.ok) {
         if (result.kind === 'fetch-failed' || result.kind === 'fetch-error') {
           // Stale URL: evict caches AND release the prefetch latch so the settle
@@ -4473,13 +4722,13 @@
 
       showLanguageToast(fetchedNativeLocale);
     } catch (err) {
-      if (ep.disposed || ep !== currentEp()) return;
+      if (seq !== _activateSeq || ep.disposed || ep !== currentEp()) return;
       log.error('Subtitle activation error:', err);
       setButtonState(btn, 'error');
       setJpStatus(PROTOCOL.STATUS.ERROR);
       showErrorToast('Subtitle activation failed.', () => handleButtonClick(btn).catch(() => {}));
     } finally {
-      if (ep === currentEp()) clickInProgress = false;
+      if (seq === _activateSeq && ep === currentEp()) clickInProgress = false;
     }
   }
 
@@ -4743,6 +4992,7 @@
     const ep = currentEp();
     if (ep) restoreExternal(ep).catch(() => {});
     tryAutoActivate();
+    scheduleAutoTranslate(ep);
     syncSubSuppression();   // start hiding CR subs immediately if "hide official" is on
     backgroundValidateAll().catch(() => {});
   }
@@ -4764,6 +5014,7 @@
         buttonInControls = false;
         movedToControls  = false;
         injectButton();
+        scheduleAutoTranslate();
         renderer.mount(video);
         hudCtl    = null;
         const btn = document.getElementById(BTN_ID);
@@ -4787,6 +5038,7 @@
           existing.remove();
           sourceMenu.removeButton();
           injectButton();
+          scheduleAutoTranslate();
         }
       }
 
@@ -4997,7 +5249,12 @@
     let playbackId = null;
     try {
       const parsed = new URL(url, location.href);
-      if (parsed.origin === location.origin) playbackId = parsed.pathname.match(PLAYBACK_RE)?.[1];
+      if (parsed.origin === location.origin) {
+        const m = parsed.pathname.match(PLAYBACK_RE);
+        if (m) { _lastPlaybackVer = m[1]; playbackId = m[2]; }
+      } else if (parsed.hostname === 'cr-play-service.prd.crunchyrollsvc.com') {
+        playbackId = parsed.pathname.match(CR_PLAY_SERVICE_RE)?.[1] ?? null;
+      }
     } catch (_) {}
     if (playbackId) return interceptPlayback(args, playbackId);
     if (MANIFEST_RE.test(url))       return interceptManifest(args, ep);
@@ -5027,6 +5284,18 @@
     return isHideOfficialSubs() ? stripOfficialSubs(response) : response;
   }
 
+  function cleanStreamUrl(data) {
+    const hs   = data?.hardSubs ?? data?.hardsubs ?? data?.hard_subs;
+    const none = hs && (hs.none ?? hs.None);
+    const u    = PLAYBACK.entryUrl(none);
+    if (u) return u;
+    if (typeof data?.url !== 'string' || !data.url) return null;
+    if (/\/clean\//.test(data.url)) return data.url;
+    const burned = (typeof data.burnedInLocale === 'string' && !!data.burnedInLocale) ||
+      /\/0\/[a-z]{2}(?:-[A-Za-z0-9]+)?\//.test(data.url);
+    return burned ? null : data.url;
+  }
+
   async function stripOfficialSubs(response) {
     try {
       const data = await response.clone().json();
@@ -5039,12 +5308,17 @@
         data.subtitles = {};
         // The newer player serves HARDSUBBED video — the subtitle is burned into
         // the picture, picked from this hardSubs map by the viewer's subtitle
-        // preference.  Empty it so the player falls back to the raw top-level
-        // stream URL and the burned-in text never appears.  Only when a raw url
-        // exists, so we never strand the player with no stream.
-        if (data.url && data.hardSubs)  data.hardSubs  = {};
-        if (data.url && data.hardsubs)  data.hardsubs  = {};
-        if (data.url && data.hard_subs) data.hard_subs = {};
+        // preference (or served directly as data.url when burnedInLocale is set).
+        // Switch data.url to the clean variant first and empty hardSubs so the
+        // player loads subtitle-free video without needing to click "None".
+        const clean = cleanStreamUrl(data);
+        if (clean) {
+          data.url = clean;
+          if (typeof data.burnedInLocale === 'string') data.burnedInLocale = '';
+          if (data.hardSubs)  data.hardSubs  = {};
+          if (data.hardsubs)  data.hardsubs  = {};
+          if (data.hard_subs) data.hard_subs = {};
+        }
       }
       const headers = {};
       response.headers.forEach((v, k) => { headers[k] = v; });
@@ -5076,12 +5350,16 @@
       // served url directly — verified "" on clean streams; non-empty is
       // treated as burned. The URL observer stays as fallback for responses
       // that omit the field.
-      if (typeof data.burnedInLocale === 'string' && data.burnedInLocale) {
+      const strippedClean = isHideOfficialSubs() && !!cleanStreamUrl(data);
+      if (!strippedClean && typeof data.burnedInLocale === 'string' && data.burnedInLocale) {
         stopHardsubWatch();
         _hardsubStream = true;
         if (overlayActive) maybeWarnHardsub();
-      } else {
+      } else if (!strippedClean) {
         watchForHardsubStream(data.hardSubs ?? data.hardsubs ?? data.hard_subs);
+      } else {
+        stopHardsubWatch();
+        _hardsubStream = false;
       }
       log.info(`[${currentAudio}] session subtitle locales [${Object.keys(sessionSubs).join(', ') || 'none'}]`);
 
@@ -5120,6 +5398,7 @@
           if (btn) setButtonState(btn, 'unavail');
         }
         tryAutoActivate();
+        scheduleAutoTranslate(ep);
         return;
       }
 
@@ -5138,6 +5417,7 @@
       }
 
       tryAutoActivate();
+      scheduleAutoTranslate(ep);
       onJpDataReady();
       backgroundValidateAll().catch(() => {});
 

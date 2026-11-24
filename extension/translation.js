@@ -128,6 +128,7 @@ function fill(state) {
   el('source').value = state.source;
   el('target').value = state.target;
   el('enabled').checked = state.enabled;
+  el('autoTranslate').checked = state.autoTranslate === true;
   el('workEnabled').checked = state.workEnabled === true;
   el('apiKey').value = '';
   el('apiKey').placeholder = t(state.hasKey ? '留空保留当前密钥' : '输入密钥');
@@ -150,8 +151,8 @@ function payload() {
       concurrency: Number(el('concurrency').value),
       translationMode: el('translationMode').value, glossary,
     }),
-    apiKey: el('apiKey').value.trim(), enabled: el('enabled').checked, workEnabled: el('workEnabled').checked,
-    target: el('target').value, source: el('source').value,
+    apiKey: el('apiKey').value.trim(), enabled: el('enabled').checked, autoTranslate: el('autoTranslate').checked,
+    workEnabled: el('workEnabled').checked, target: el('target').value, source: el('source').value,
   };
 }
 function setBusy(value) {

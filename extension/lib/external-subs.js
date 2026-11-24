@@ -506,7 +506,7 @@
       const tabId = sender.tab.id, attemptKey = `externalFollowAttempt:${tabId}`;
       const tag = JSON.stringify([guid, rule.revision, meta.episode]);
       const previous = (await chrome.storage.session.get(attemptKey))[attemptKey];
-      if (previous?.tag === tag) return { ok: true, record: null, followError: previous.error || null };
+      if (previous?.tag === tag) return { ok: true, record: null, hasFollowRule: true, followError: previous.error || null };
       await chrome.storage.session.set({ [attemptKey]: { tag } });
       const snapshot = crypto.randomUUID();
       await chrome.storage.session.set({ [`externalSnapshot:${snapshot}`]: { tabId, meta, expires: Date.now() + 120000 } });
@@ -558,7 +558,7 @@
         const code = /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'ASSRT_DOWNLOAD_NETWORK';
         if ((await chrome.storage.session.get(attemptKey))[attemptKey]?.tag === tag)
           await chrome.storage.session.set({ [attemptKey]: { tag, error: code } });
-        return { ok: true, record: null, followError: code };
+        return { ok: true, record: null, hasFollowRule: true, followError: code };
       } finally { await chrome.storage.session.remove(`externalSnapshot:${snapshot}`); }
     }
     async function restore(guid, metadata, sender) {
@@ -568,9 +568,13 @@
       if (!record && !selected && sender?.tab && metadata) {
         const detected = self.CRSubFix.episodeMetadata.validate(metadata, guid);
         const meta = self.CRSubFix.episodeMetadata.reconcile(detected, db.identities[guid]);
-        const rules = Object.values(db.followRules || {}).filter(r => r.seriesId === meta.seriesId);
-        if (!C.identity(meta)) return { ok: true, record: null, metadataPending: true,
-          followError: rules.length ? 'FOLLOW_METADATA_REQUIRED' : null };
+        const allRules = Object.values(db.followRules || {});
+        const rules = allRules.filter(r => r.seriesId === meta.seriesId);
+        if (!C.identity(meta)) {
+          const mayFollow = rules.length > 0 || (!meta.seriesId && allRules.length > 0);
+          return { ok: true, record: null, metadataPending: mayFollow,
+            hasFollowRule: rules.length > 0, followError: rules.length ? 'FOLLOW_METADATA_REQUIRED' : null };
+        }
         const rule = db.followRules?.[C.key(meta)];
         if (rule) {
           const key = `${sender.tab.id}:${guid}`;
@@ -580,7 +584,13 @@
           return task;
         }
       }
-      return { ok: true, active: selected?.active !== false, record: record ? { guid, id: recordId(record),
+      const idMeta = metadata
+        ? self.CRSubFix.episodeMetadata.reconcile(self.CRSubFix.episodeMetadata.validate(metadata, guid), db.identities[guid])
+        : db.identities[guid];
+      const hasFollowRule = Boolean(idMeta && (db.followRules?.[C.key(idMeta)] ||
+        (idMeta.seriesId && Object.values(db.followRules || {}).some(r =>
+          r.seriesId === idMeta.seriesId && (idMeta.season == null || r.season === idMeta.season)))));
+      return { ok: true, active: selected?.active !== false, hasFollowRule, record: record ? { guid, id: recordId(record),
         filename: record.name, text: record.text, lang: selected.lang, sync: selected.sync, provider: sourceName(record) } : null };
     }
     async function setActive(payload) {

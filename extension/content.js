@@ -52,6 +52,14 @@
   function applySettings(s) {
     latestSettings = s;
     SETTINGS.writeAttrs(document.documentElement, s);
+    // Synchronous first-paint mirrors so document_start playback intercepts read
+    // the exact user preference before the async background round-trip settles.
+    try {
+      localStorage.setItem('crSubFix_mirror_hideOfficial', s.hideOfficialSubs !== false ? '1' : '0');
+      localStorage.setItem('crSubFix_mirror_autoActivate', s.autoActivate !== false ? '1' : '0');
+      if (typeof s.mtTarget === 'string' && s.mtTarget) localStorage.setItem('crSubFix_mt_target', s.mtTarget);
+      if (typeof s.mtSource === 'string') localStorage.setItem('crSubFix_mt_source', s.mtSource);
+    } catch (_) {}
     // Re-init libass when ANY sign style override changes so the new look applies
     // live (the CSS dialogue style is handled by the renderer via writeAttrs).
     const key = [s.sign_styleOverride, s.sign_overrideFontFamily, s.sign_overrideTextColor,

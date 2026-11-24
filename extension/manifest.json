@@ -43,8 +43,8 @@
    "options_page": "translation.html",
    "optional_host_permissions": [ "https://*/*", "http://*.assrt.net/*", "http://localhost/*", "http://127.0.0.1/*" ],
    "permissions": [ "storage", "webRequest" ],
-   "version": "2.7.0.36",
-   "version_name": "2.7.0 + Relay 34 Beta",
+   "version": "2.7.0.37",
+   "version_name": "2.7.0 + Relay 37 Beta",
    "web_accessible_resources": [ {
       "matches": [ "*://www.crunchyroll.com/*" ],
       "resources": [ "lib/octopus/subtitles-octopus-worker.js", "lib/octopus/subtitles-octopus-worker.wasm", "lib/octopus/Tinos-Regular.ttf", "lib/octopus/Arimo.ttf", "lib/octopus/Cousine-Regular.ttf" ]

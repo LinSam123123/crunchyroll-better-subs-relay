@@ -143,6 +143,14 @@ try {
   await page.locator('#model').fill('mock-subtitle-model');
   await page.locator('#apiKey').fill('test-key-not-real');
   await page.locator('#enabled').check();
+  assert.equal(await page.locator('#autoTranslate').isChecked(), false);
+  await page.locator('#autoTranslate').check();
+  await page.locator('#save').click();
+  await page.waitForFunction(() => document.getElementById('status').textContent === '已保存。');
+  await page.reload();
+  await page.waitForFunction(() => !document.getElementById('fields').disabled);
+  assert.equal(await page.locator('#autoTranslate').isChecked(), true);
+  await page.locator('#autoTranslate').uncheck();
   await page.locator('#save').click();
   await page.waitForFunction(() => document.getElementById('status').textContent === '已保存。');
   assert.equal(await page.locator('#apiKey').inputValue(), '');

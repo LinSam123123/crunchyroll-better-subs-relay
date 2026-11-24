@@ -11,6 +11,7 @@
     '日本語': { en: '日本語', ja: '日本語', 'zh-Hant': '日本語' },
     '翻译接口': { en: 'Translation API', ja: '翻訳 API', 'zh-Hant': '翻譯介面' },
     '启用翻译': { en: 'Enable translation', ja: '翻訳を有効にする', 'zh-Hant': '啟用翻譯' },
+    '无外部字幕时自动翻译': { en: 'Auto-translate when no external subtitles are selected', ja: '外部字幕が未選択のときは自動翻訳する', 'zh-Hant': '無外部字幕時自動翻譯' },
     '服务类型': { en: 'Service type', ja: 'サービスの種類', 'zh-Hant': '服務類型' },
     '自选中转 API': { en: 'Custom relay API', ja: 'カスタム中継 API', 'zh-Hant': '自選中轉 API' },
     'DeepL API': { en: 'DeepL API', ja: 'DeepL API', 'zh-Hant': 'DeepL API' },

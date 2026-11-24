@@ -20,8 +20,8 @@
   const SCHEMA = [
     { key: 'uiLanguage',           attr: 'data-cr-ui-language',    default: 'auto',     type: 'string' },
     { key: 'enabled',              attr: 'data-cr-sub-fix',        default: true,       type: 'bool'   },
-    { key: 'autoActivate',         attr: 'data-cr-auto-activate',  default: false,      type: 'bool'   },
-    { key: 'hideOfficialSubs',     attr: 'data-cr-hide-official',  default: false,      type: 'bool'   },
+    { key: 'autoActivate',         attr: 'data-cr-auto-activate',  default: true,       type: 'bool'   },
+    { key: 'hideOfficialSubs',     attr: 'data-cr-hide-official',  default: true,       type: 'bool'   },
     // Per-layer visibility ("Show on screen").  Independent of the master overlay
     // on/off: hide just the spoken-line band, or just the typeset signs, while the
     // other layer keeps rendering.  Toggled from BOTH the popup and the player's
@@ -38,14 +38,14 @@
     // Dual signs ("Both" mode): how far (% of video height) to lift the secondary
     // track's typeset signs above the primary's so the two don't overlap.
     { key: 'secondarySignGap',     attr: 'data-cr-sec-sign-gap',    default: 8,          type: 'int'    },
-    { key: 'styleOverride',        attr: 'data-cr-style-override', default: false,      type: 'bool'   },
+    { key: 'styleOverride',        attr: 'data-cr-style-override', default: true,       type: 'bool'   },
     { key: 'overrideFontFamily',   attr: 'data-cr-font-family',    default: '',         type: 'string' },
     { key: 'overrideTextColor',    attr: 'data-cr-override-color', default: '#ffffff',  type: 'string' },
     { key: 'overrideTextOpacity',  attr: 'data-cr-text-opacity',   default: 100,        type: 'int'    },
     { key: 'overrideOutlineColor', attr: 'data-cr-outline-color',  default: '#000000',  type: 'string' },
-    { key: 'overrideBord',         attr: 'data-cr-bord-size',      default: 2,          type: 'float'  },
+    { key: 'overrideBord',         attr: 'data-cr-bord-size',      default: 1.5,        type: 'float'  },
     { key: 'overrideShad',         attr: 'data-cr-shad-size',      default: 1,          type: 'float'  },
-    { key: 'overrideShadStyle',    attr: 'data-cr-shad-style',     default: 'hard',     type: 'string' },
+    { key: 'overrideShadStyle',    attr: 'data-cr-shad-style',     default: 'soft',     type: 'string' },
     { key: 'overrideShadOpacity',  attr: 'data-cr-shad-opacity',   default: 80,         type: 'int'    },
     { key: 'overrideBgBox',        attr: 'data-cr-bg-box',         default: false,      type: 'bool'   },
     { key: 'overrideBgColor',      attr: 'data-cr-bg-color',       default: '#000000',  type: 'string' },
@@ -58,17 +58,16 @@
     { key: 'overrideBgGlassSat',   attr: 'data-cr-bg-glass-sat',   default: 160,        type: 'int'    },
     { key: 'overrideBgGlassHue',   attr: 'data-cr-bg-glass-hue',   default: 0,          type: 'int'    },
     // Per-type style profile for TYPESET SIGNS (\pos cues).  Mirrors the dialogue
-    // keys above with a `sign_` prefix; default sign_styleOverride=false means
-    // "match original" (native ASS style), so signs blend into the artwork until
-    // the user opts into a custom sign look via the popup's "Style for: Signs".
-    { key: 'sign_styleOverride',        attr: 'data-cr-sign-style-override', default: false,     type: 'bool'   },
+    // keys above with a `sign_` prefix. Turning the override off restores the
+    // original ASS style.
+    { key: 'sign_styleOverride',        attr: 'data-cr-sign-style-override', default: true,      type: 'bool'   },
     { key: 'sign_overrideFontFamily',   attr: 'data-cr-sign-font-family',    default: '',        type: 'string' },
     { key: 'sign_overrideTextColor',    attr: 'data-cr-sign-color',          default: '#ffffff', type: 'string' },
     { key: 'sign_overrideTextOpacity',  attr: 'data-cr-sign-text-opacity',   default: 100,       type: 'int'    },
     { key: 'sign_overrideOutlineColor', attr: 'data-cr-sign-outline-color',  default: '#000000', type: 'string' },
-    { key: 'sign_overrideBord',         attr: 'data-cr-sign-bord-size',      default: 2,         type: 'float'  },
+    { key: 'sign_overrideBord',         attr: 'data-cr-sign-bord-size',      default: 1.5,       type: 'float'  },
     { key: 'sign_overrideShad',         attr: 'data-cr-sign-shad-size',      default: 1,         type: 'float'  },
-    { key: 'sign_overrideShadStyle',    attr: 'data-cr-sign-shad-style',     default: 'hard',    type: 'string' },
+    { key: 'sign_overrideShadStyle',    attr: 'data-cr-sign-shad-style',     default: 'soft',    type: 'string' },
     { key: 'sign_overrideShadOpacity',  attr: 'data-cr-sign-shad-opacity',   default: 80,        type: 'int'    },
     { key: 'sign_overrideBgBox',        attr: 'data-cr-sign-bg-box',         default: false,     type: 'bool'   },
     { key: 'sign_overrideBgColor',      attr: 'data-cr-sign-bg-color',       default: '#000000', type: 'string' },
@@ -92,6 +91,7 @@
     // and must never be mirrored to the page DOM.  Only these non-secret
     // selectors cross into the page.  mtSource '' = auto-pick the best track.
     { key: 'mtEnabled',            attr: 'data-cr-mt-enabled',     default: false,      type: 'bool'   },
+    { key: 'mtAutoTranslate',      attr: 'data-cr-mt-auto',        default: false,      type: 'bool'   },
     { key: 'mtWorkEnabled',        attr: 'data-cr-mt-work-enabled', default: false,      type: 'bool'   },
     { key: 'mtProvider',           attr: 'data-cr-mt-provider',    default: 'relay',    type: 'string' },
     { key: 'mtTarget',             attr: 'data-cr-mt-target',      default: 'zh-CN',    type: 'string' },

@@ -95,7 +95,7 @@ async function getConfig() {
   if (cfg.provider === 'local') authorized = true;
   else if (isConfigured(s)) authorized = await chrome.permissions.contains({ origins: [RELAY.originPattern(RELAY.host(cfg, s.mtApiKey))] });
   return { ok: true, config: cfg, cloudConfig: s.mtCloudConfig, hasKey: !!s.mtApiKey, authorized,
-    enabled: s.mtEnabled, target: s.mtTarget, source: s.mtSource, workEnabled: s.mtWorkEnabled };
+    enabled: s.mtEnabled, autoTranslate: s.mtAutoTranslate === true, target: s.mtTarget, source: s.mtSource, workEnabled: s.mtWorkEnabled };
 }
 async function assistConfig() {
   const s = await chrome.storage.local.get({ subtitleAssistConfig: null, subtitleAssistKey: '', relayConfig: null, mtApiKey: '' });
@@ -181,6 +181,7 @@ async function saveConfig(payload) {
     mtTarget: payload.target, mtSource: payload.source, mtBatchSize: cfg.batchSize, mtMaxChars: cfg.maxChars,
     mtConcurrency: cfg.concurrency, mtTimeoutMs: cfg.timeoutMs,
     mtTranslationMode: cfg.translationMode,
+    mtAutoTranslate: payload.autoTranslate === undefined ? s.mtAutoTranslate : payload.autoTranslate === true,
     mtWorkEnabled: payload.workEnabled === undefined ? s.mtWorkEnabled : payload.workEnabled === true,
     mtConfigTag: changed || !s.mtConfigTag ? crypto.randomUUID() : s.mtConfigTag,
   });

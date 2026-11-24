@@ -75,6 +75,7 @@ const previewBox          = document.getElementById('previewBox');
 const togglePreviewAnimate = document.getElementById('togglePreviewAnimate');
 // Machine translation
 const toggleMtEnabled     = document.getElementById('toggleMtEnabled');
+const toggleMtAuto        = document.getElementById('toggleMtAuto');
 const mtStatus            = document.getElementById('mtStatus');
 
 // ── Style presets ─────────────────────────────────────────────────────────
@@ -506,6 +507,7 @@ function populateFromSettings(s) {
   // Machine translation selectors (the API key is NOT a schema setting — it's
   // loaded/saved separately so it never enters the synced settings bundle).
   if (toggleMtEnabled) toggleMtEnabled.checked = s.mtEnabled !== false;
+  if (toggleMtAuto) toggleMtAuto.checked = s.mtAutoTranslate !== false;
 
   updatePreview();
 }
@@ -528,6 +530,7 @@ async function refreshMtStatus() {
       });
     } else uiText(mtStatus, '未配置 / Not configured');
     toggleMtEnabled.checked = state.enabled;
+    if (toggleMtAuto) toggleMtAuto.checked = state.autoTranslate === true;
   } catch (_) { uiText(mtStatus, '设置读取失败 / Settings unavailable'); }
 }
 refreshMtStatus();
@@ -545,6 +548,9 @@ chrome.storage.onChanged.addListener((_changes, area) => {
 
 toggleMtEnabled?.addEventListener('change', () => {
   chrome.storage.local.set({ mtEnabled: toggleMtEnabled.checked });
+});
+toggleMtAuto?.addEventListener('change', () => {
+  chrome.storage.local.set({ mtAutoTranslate: toggleMtAuto.checked });
 });
 // ── Enable / Auto-activate ────────────────────────────────────────────────
 
@@ -993,7 +999,7 @@ surveySend?.addEventListener('click', async () => {
     // Booleans from the settings schema only — a feature-flag picture, not data.
     const s = await new Promise(res => chrome.storage.local.get(self.CRSubFix.settings.defaults(), res));
     const flags = ['enabled','autoActivate','hideOfficialSubs','showDialogue','showSigns',
-                   'styleOverride','autoPauseLine','mtEnabled']
+                   'styleOverride','autoPauseLine','mtEnabled','mtAutoTranslate']
       .map(k => `${k}=${!!s[k]}`).join(' ');
     lines.push(`settings: ${flags}`);
   }

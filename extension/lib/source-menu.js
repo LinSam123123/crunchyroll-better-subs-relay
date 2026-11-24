@@ -98,6 +98,7 @@
       if (!ep) return false;
       if (locale === 'ja-JP') {
         if (ep.jpCaptionUrl || ep.jpSubtitleUrl) return true;
+        if (ep.catalog.entries?.().some(([s]) => s === 'ja-JP')) return false;
         return ep.jpGuid ? null : false;
       }
       return ep.catalog.availability(locale);
@@ -504,6 +505,11 @@
           (on) => toggle('signs', on), 'On-screen text — signs, titles, captions'));
         menuEl.appendChild(makeToggleRow('Crunchyroll’s own subtitles', layer('official', false),
           (on) => toggle('official', on), 'Turn off to hide CR’s built-in subtitles'));
+        menuEl.appendChild(makeDivider());
+        menuEl.appendChild(makeToggleRow('Auto-enable subtitles', layer('auto', true),
+          (on) => toggle('auto', on), 'Turns on when the episode starts playing'));
+        menuEl.appendChild(makeToggleRow('Auto-translate without external subs', layer('autoTranslate', true),
+          (on) => toggle('autoTranslate', on), 'Turns off automatically when external subtitles are active'));
         return;
       }
 
@@ -701,6 +707,17 @@
           secLabel ? t('Second subtitle: {language}', { language: secLabel }) : 'Show two subtitles for study',
           () => { view = 'learn'; buildContent(menuEl); }, true));
       }
+
+      // (c-2) Quick actions — 1-tap external subs & translate/cancel right on
+      // the primary menu so daily actions don't require opening Manage.
+      const quick = [];
+      if (onExternalSubs) quick.push({ icon: '📂', label: '外部字幕…', onClick: () => { close(); onExternalSubs(); } });
+      if (getCancelAction?.() && onCancelTranslate) {
+        quick.push({ icon: '⏹', label: 'Cancel', onClick: () => { close(); onCancelTranslate(); } });
+      } else if (getTranslateAction?.() && onTranslate) {
+        quick.push({ icon: '🌐', label: 'Translate', onClick: () => { close(); onTranslate(); } });
+      }
+      if (quick.length) menuEl.appendChild(make2ColRow(quick));
 
       // (d) Show on screen + Manage sources — a compact two-up row.
       const tools = [];

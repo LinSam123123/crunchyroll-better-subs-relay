@@ -26,7 +26,7 @@ try {
   await worker.evaluate(() => chrome.storage.local.set({ autoActivate: true, mtEnabled: false }));
   await browser.route('**/*', async route => {
     const url = new URL(route.request().url());
-    const match = url.pathname.match(/\/playback\/v3\/([^/]+)\/web\/[^/]+\/play/);
+    const match = url.pathname.match(/\/playback\/v\d+\/([^/]+)\/web\/[^/]+\/play/);
     if (match) {
       const id = match[1]; requests.push(id);
       if (id === delayId) await new Promise(resolve => setTimeout(resolve, 300));
@@ -110,6 +110,11 @@ try {
   await ready('FAST'); await slowSubtitleFinished;
   await page.waitForFunction(() => CRSubFix.episode.current().originalCues[0]?.text === 'Synthetic FAST.vtt');
   checks.push('An old subtitle download finishing during the new episode cannot overwrite its cues');
+  await page.evaluate(() => {
+    history.pushState({}, '', '/zh-tw/watch/V4EP/title');
+    return fetch('/playback/v4/V4EP/web/edge/play?locale=zh-TW');
+  });
+  await ready('V4EP'); checks.push('Playback v4 endpoint with locale query populates catalog and renders subtitles');
   await page.evaluate(() => {
     history.pushState({}, '', '/zh-tw/watch/DUB/title');
     return fetch(new Request('/playback/v3/DUB/web/chrome/play', { headers: { Authorization: 'fixture-token' } }));

@@ -8,6 +8,13 @@ An unofficial Crunchyroll subtitle extension for choosing official tracks, findi
 
 Based on [Better Subs for Crunchyroll](https://github.com/anitastic-pixel/Better-Subs-for-Crunchyroll), with thanks to its creator, anitastic-pixel. This fork is not an official release from Crunchyroll or the upstream author.
 
+## New in 2.7.0.37
+
+- Detect subtitles on Crunchyroll's `/playback/v4` and use a clean video stream when available to avoid overlapping subtitles.
+- Enable the extension subtitle overlay by default. Pair monolingual translations or external files with an official English secondary track, and avoid a third layer when the file is already bilingual.
+- Open External subtitles or Translate / Cancel directly from the player menu.
+- Optional automatic translation prefers an official target-language track and respects external subtitles and collection following. Enable it in translation settings.
+
 ## New in 2.7.0.36
 
 - Distinguish same-name assrt files by stable source IDs and sizes, preserving their identities through preview, caching and confirmed episode mappings.
@@ -83,7 +90,7 @@ Adjust timing in 100ms steps when needed. BD, Netflix, AT-X, and Crunchyroll rel
 - No usable keys are included in the repository or download. Use your own accounts. Keys are stored locally by the browser extension; this is **not an encrypted vault**.
 - Cloud translation sends subtitle text to your selected DeepL or compatible provider. Local translation does not send subtitles to those services; the initial model download requires internet access. AI analysis sends the relevant work information or filenames to your configured analysis service.
 - Subtitle searches send keywords to the selected service; downloads contact its file server. Work information queries contact Bangumi, and official regional title queries contact Crunchyroll. Chinese script conversion is offline.
-- Opening a page, changing episodes, or failing to find subtitles does not automatically start paid translation or AI analysis. Check each provider's prices and privacy terms.
+- Automatic translation is off by default. Once enabled, changing episodes can send subtitles to the selected provider and incur charges. AI analysis starts on request. Check each provider's prices and privacy terms.
 - Access to service domains is requested as needed. Do not give real keys to unknown providers. Redact keys, account information, and temporary download links before sharing screenshots.
 - No anime videos or finished subtitle collections are distributed. The extension does not bypass subscriptions, regional restrictions, or DRM. Respect each subtitle source's availability and usage rights.
 
